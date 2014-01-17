@@ -38,7 +38,8 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define DOCOPT_NO_HELP              0x1
 #define DOCOPT_HELP                 0x0
-#define DOCOPT_SIMPLE_BACKEND       0x2
+#define DOCOPT_NO_OPTIONS_FIRST     0x2
+#define DOCOPT_OPTIONS_FIRST        0x0
 
 typedef void* docopt_t;
 typedef struct docopt_str { const char* fst; const char* lst; } docopt_str_t;
@@ -61,13 +62,13 @@ void docopt_free(docopt_t);
 #include <stdlib.h>
 #include <string.h>
 
-#define DOCOPT_TYPE_TBL(X) X(BAD) X(LONG) X(SHORTS) X(SHORT) X(OPTREF) X(PNAME) X(COMMAND) X(ARGUMENT) X(SEQ) X(EXPR) X(MAX)
+#define DOCOPT_TYPE_TBL(X) X(BAD) X(USAGE_SECTION) X(USAGE_STATEMENT) X(OPTION_SECTION) X(OPTION_STATEMENT) X(LONG) X(SHORT) X(OPTREF) X(PNAME) X(COMMAND) X(ARGUMENT) X(SEQ) X(EXPR) X(MAX)
 enum DOCOPT_TYPE
 {
 #define DOCOPT_TYPE_ENUM(N) DOCOPT_TYPE_##N,
 DOCOPT_TYPE_TBL(DOCOPT_TYPE_ENUM)
 };
-const char* DOCOPT_TYPE_NAMES[] =
+static const char* DOCOPT_TYPE_NAMES[] =
 {
 #define DOCOPT_TYPE_NAME(N) #N,
 DOCOPT_TYPE_TBL(DOCOPT_TYPE_NAME)
@@ -95,15 +96,9 @@ DOCOPT_TYPE_TBL(DOCOPT_TYPE_NAME)
 
 #define DOCOPT_REPEAT                       "..."
 
-static regmatch_t docopt_pmatches[DOCOPT_NUM_PMATCHES] = { };
+static regmatch_t docopt_pmatches[DOCOPT_NUM_PMATCHES];
 
 #define DOCOPT_PR(str) docopt_str_len(str), str->fst
-
-struct docopt_arg
-{
-    struct docopt_str   value;
-    struct docopt_arg*  next;
-};
 
 struct docopt_entry
 {
@@ -111,7 +106,12 @@ struct docopt_entry
     char                short_name[3];
     struct docopt_str   command;
     struct docopt_str   defvalue;
-    struct docopt_arg*  arg;
+};
+
+struct docopt_arg
+{
+    struct docopt_entry*    owner;
+    struct docopt_str       value;
 };
 
 struct docopt_entries
@@ -126,6 +126,7 @@ struct docopt_entries
     int                     curentry;
     struct docopt_entry*    entries;
 
+    int                     nargs;
     struct docopt_arg*      args;
 };
 
@@ -135,7 +136,6 @@ struct docopt_term
     unsigned int    type        : 5;
     unsigned int    optional    : 1;
     unsigned int    repeat      : 1;
-    unsigned int    eat_all     : 1;
     unsigned int    length      : 20;
 };
 
@@ -143,6 +143,7 @@ struct docopt_parse_state
 {
     FILE*                   log;
     struct docopt_entries*  entries;
+    struct docopt_entries*  args;
 
     int                     nterms;
     int                     curterm;
@@ -154,10 +155,11 @@ struct docopt_parse_state
     char                    arged_shorts[128];
     char                    unarged_shorts[128];
     int                     usage_term;
+    int                     args_term;
+    int                     optional;
     int                     positional;
 
     int                     curarg;
-    int                     curargoff;
     int                     argc;
     char**                  argv;
 
@@ -179,7 +181,13 @@ struct docopt_parse_state
     regex_t                 re_command;
 };
 
-static int docopt_str_len(struct docopt_str* str) { return str->lst - str->fst; }
+static unsigned docopt_str_len(struct docopt_str* str) { return (unsigned)(str->lst - str->fst); }
+
+static void docopt_set_arg(struct docopt_arg* arg, struct docopt_entry* entry, struct docopt_str* value)
+{
+    arg->owner  = entry;
+    arg->value  = *value;
+}
 
 static int docopt_entries_get_entry(struct docopt_entries* dE, struct docopt_str* str)
 {
@@ -187,7 +195,7 @@ static int docopt_entries_get_entry(struct docopt_entries* dE, struct docopt_str
     {
         if (((docopt_str_len(str) > 0) &&
                 docopt_str_len(str) == docopt_str_len(&dE->entries[i].name)) &&
-                (strncmp(str->fst, dE->entries[i].name.fst, docopt_str_len(str)) == 0))
+                !strncmp(str->fst, dE->entries[i].name.fst, docopt_str_len(str)))
             return i;
         if ((docopt_str_len(str) == 2) && (strncmp(str->fst, &dE->entries[i].short_name[0], 2) == 0))
             return i;
@@ -195,7 +203,7 @@ static int docopt_entries_get_entry(struct docopt_entries* dE, struct docopt_str
     return -1;
 }
 
-static struct docopt_entry* docopt_entries_deref(struct docopt_entries* dE, int hentry)
+static struct docopt_entry* docopt_fetch_entry(struct docopt_entries* dE, int hentry)
 {
     assert(hentry >= 0);
     return &dE->entries[hentry];
@@ -249,26 +257,6 @@ static int docopt_new_term(struct docopt_parse_state* dS, enum DOCOPT_TYPE type)
     return hterm;
 }
 
-static void docopt_add_arg_list(struct docopt_parse_state* dS, struct docopt_entries* dE, struct docopt_entry* entry, int argoff, int off, int atend)
-{
-    struct docopt_arg*  arg = 0;
-    if ((entry->arg == 0) || !atend)
-    {
-        entry->arg  = &dE->args[dS->curarg+argoff];
-        arg         = entry->arg;
-    }
-    else
-    {
-        arg             = entry->arg;
-        while (arg->next != 0)
-            arg         = arg->next;
-        arg->next       = &dE->args[dS->curarg+argoff];
-        arg             = arg->next;
-    }
-    arg->value.fst      = &dS->argv[dS->curarg+argoff][off];
-    arg->value.lst      = dS->argv[dS->curarg+argoff] + strlen(dS->argv[dS->curarg]);
-}
-
 static void docopt_parse_state_free(struct docopt_parse_state* dS)
 {
     if (!dS) return;
@@ -300,7 +288,8 @@ static int docopt_parse_state_init(struct docopt_parse_state* dS, const char* do
     dS->entries->nentries           = 2;
     dS->entries->curentry           = 1;
     if (!(dS->entries->entries = (struct docopt_entry*)calloc(sizeof(struct docopt_entry), dS->entries->nentries))) goto docoptFail;
-    if (!(dS->entries->args = (struct docopt_arg*)calloc(sizeof(struct docopt_arg), argc))) goto docoptFail;
+    if (!(dS->entries->args = (struct docopt_arg*)calloc(sizeof(struct docopt_arg), dS->argc))) goto docoptFail;
+    dS->entries->nargs              = dS->argc;
     dS->nterms                      = 1;
     dS->curterm                     = 0;
     if (!(dS->terms = (struct docopt_term*)calloc(sizeof(struct docopt_term), dS->nterms))) goto docoptFail;
@@ -358,7 +347,6 @@ static int docopt_parse_options(struct docopt_parse_state* dS)
     char re_arged_shorts[256]   = { 0 };
     char short_name[3]          = "- ";
     struct docopt_str sname     = { &short_name[0], &short_name[2] };
-    int options                 = 0;
     int options_x               = 0;
     int options_s               = 0;
     int sterm                   = 0;
@@ -368,9 +356,7 @@ static int docopt_parse_options(struct docopt_parse_state* dS)
     dS->option_section.lst  = dS->entries->docstr.lst;
     optstmt.fst                 = dS->option_section.fst;
 
-    options_x                   = docopt_new_term(dS, DOCOPT_TYPE_EXPR);
-    docopt_fetch_term(dS, options)->optional = 1;
-    docopt_fetch_term(dS, options)->repeat = 1;
+    options_x                   = docopt_new_term(dS, DOCOPT_TYPE_OPTION_SECTION);
     while (!docopt_get_section(dS, &dS->re_option_statement_start, &dS->re_option_statement_start, optstmt.fst, &optstmt, 3, 0))
     {
         sterm           = -1;
@@ -379,11 +365,11 @@ static int docopt_parse_options(struct docopt_parse_state* dS)
         memset(&option, 0x0, sizeof(option));
         if (optstmt.fst >= dS->option_section.lst) break;
         docopt_eat_ws(&optstmt);
+        options_s   = docopt_new_term(dS, DOCOPT_TYPE_OPTION_STATEMENT);
         for (int X = 0; X < 2; ++X)
         {
             if ((which_first != 1) && regexec(&dS->re_optshort, optstmt.fst, DOCOPT_NUM_PMATCHES, &docopt_pmatches[0], 0) == 0)
             {
-                options_s   = docopt_new_term(dS, DOCOPT_TYPE_SEQ);
                 sterm       = docopt_new_term(dS, DOCOPT_TYPE_SHORT);
                 docopt_fetch_term(dS, sterm)->length = 1;
                 which_first = 1;
@@ -393,12 +379,10 @@ static int docopt_parse_options(struct docopt_parse_state* dS)
                     option.command.fst  = optstmt.fst + docopt_pmatches[4].rm_so;
                     option.command.lst  = optstmt.fst + docopt_pmatches[4].rm_eo;
                 }
-                docopt_fetch_term(dS, options_s)->length = dS->curterm - options_s;
             }
             else if ((which_first != 2) && regexec(&dS->re_long, optstmt.fst, DOCOPT_NUM_PMATCHES, &docopt_pmatches[0], 0) == 0)
             {
                 which_first = 2;
-                options_s       = docopt_new_term(dS, DOCOPT_TYPE_SEQ);
                 lterm           = docopt_new_term(dS, DOCOPT_TYPE_LONG);
                 docopt_fetch_term(dS, lterm)->length = 1;
                 option.name.fst = optstmt.fst;
@@ -408,7 +392,6 @@ static int docopt_parse_options(struct docopt_parse_state* dS)
                     option.command.fst  = optstmt.fst + docopt_pmatches[4].rm_so;
                     option.command.lst  = optstmt.fst + docopt_pmatches[4].rm_eo;
                 }
-                docopt_fetch_term(dS, options_s)->length = dS->curterm - options_s;
             }
             if (X == 0) optstmt.fst += docopt_pmatches[0].rm_eo + 1; docopt_eat_ws(&optstmt);
         }
@@ -424,13 +407,14 @@ static int docopt_parse_options(struct docopt_parse_state* dS)
 docoptAddOption:
         if (lterm >= 0) docopt_fetch_term(dS, lterm)->entry = docopt_entries_insert_entry(dS->entries, &option);
         if (sterm >= 0) docopt_fetch_term(dS, sterm)->entry = docopt_entries_insert_entry(dS->entries, &option);
+        docopt_fetch_term(dS, options_s)->length = dS->curterm - options_s;
     }
     docopt_fetch_term(dS, options_x)->length = dS->curterm - options_x;
     for (int i = 0, idx = 0, jdx = 0, entry; i < strlen(unarged_shorts); ++i)
     {
         short_name[1]   = unarged_shorts[i];
         if (((entry = docopt_entries_get_entry(dS->entries, &sname)) < 0) ||
-            !docopt_str_len(&docopt_entries_deref(dS->entries, entry)->command))
+            !docopt_str_len(&docopt_fetch_entry(dS->entries, entry)->command))
             dS->unarged_shorts[idx++]   = unarged_shorts[i];
         else
             dS->arged_shorts[jdx++]     = short_name[1];
@@ -515,13 +499,13 @@ int docopt_parse_atom(struct docopt_parse_state* dS, struct docopt_str* usestmt)
     }
     else if (strchr("[(", usestmt->fst[0]) != 0)
     {
-        hterm   = dS->curterm;
+        hterm           = dS->curterm;
         ++usestmt->fst;
+        dS->optional    = (olduse.fst[0] == '[');
         if (!docopt_parse_expr(dS, usestmt)) goto docoptFail;
         docopt_eat_ws(usestmt);
         if ((olduse.fst[0]+1) != usestmt->fst[0]) goto docoptFail;
         ++usestmt->fst;
-        docopt_fetch_term(dS, hterm)->optional = (olduse.fst[0] == '[');
     }
     else if (!regexec(&dS->re_long, usestmt->fst, DOCOPT_NUM_PMATCHES, &docopt_pmatches[0], 0))
     {
@@ -539,7 +523,6 @@ int docopt_parse_atom(struct docopt_parse_state* dS, struct docopt_str* usestmt)
     else if ((dS->arged_shorts[0] && !regexec(&dS->re_arged_shorts, usestmt->fst, DOCOPT_NUM_PMATCHES, &docopt_pmatches[0], 0)) ||
         !regexec(&dS->re_naked_shorts, usestmt->fst, DOCOPT_NUM_PMATCHES, &docopt_pmatches[0], 0))
     {
-        hterm           = docopt_new_term(dS, DOCOPT_TYPE_SHORTS);
         for (int h = docopt_pmatches[3].rm_so, he = docopt_pmatches[3].rm_eo; h < he; ++h)
         {
             sprintf(&entry.short_name[0], "-%c", usestmt->fst[h]);
@@ -579,7 +562,11 @@ int docopt_parse_atom(struct docopt_parse_state* dS, struct docopt_str* usestmt)
     }
 
     if (olduse.fst == usestmt->fst) goto docoptFail;
-    docopt_fetch_term(dS, hterm)->length    = dS->curterm - hterm;
+    if (hterm >= 0)
+    {
+        docopt_fetch_term(dS, hterm)->optional  = dS->optional;
+        docopt_fetch_term(dS, hterm)->length    = dS->curterm - hterm;
+    }
     return hterm;
 docoptFail:
     *usestmt        = olduse;
@@ -605,14 +592,13 @@ static int docopt_parse_usage(struct docopt_parse_state* dS)
         return 1;
     }
 
-    dS->usage_term  = docopt_new_term(dS, DOCOPT_TYPE_EXPR);
+    dS->usage_term  = docopt_new_term(dS, DOCOPT_TYPE_USAGE_SECTION);
     usestmt.fst     = dS->usage_section.fst;
     while (!docopt_get_section(dS, &dS->re_usage_statement_start, &dS->re_usage_statement_start, usestmt.fst, &usestmt, 3, 0))
     {
         if (usestmt.fst >= dS->usage_section.lst) break;
         usestmt.lst     = usestmt.lst > dS->usage_section.lst ? dS->usage_section.lst : usestmt.lst;
-        usage_section_s = docopt_new_term(dS, DOCOPT_TYPE_SEQ);
-        docopt_fetch_term(dS, usage_section_s)->eat_all = 1;
+        usage_section_s = docopt_new_term(dS, DOCOPT_TYPE_USAGE_STATEMENT);
         if (!docopt_parse_expr(dS, &usestmt))
         {
             dS->entries->error   = DOCOPT_BAD_USAGE_STATEMENT;
@@ -625,198 +611,224 @@ static int docopt_parse_usage(struct docopt_parse_state* dS)
     return 0;
 }
 
-static int docopt_parse_simple_backend(struct docopt_parse_state* dS, int hterm)
+static int docopt_unify_args(struct docopt_parse_state* dS, int hterm)
 {
-    static int indent = 0;
-    const int indentsc = 2;
+    static int indent           = 0;
+    static int scale            = 2;
     int result                  = 0;
     int curarg                  = dS->curarg;
-    int arglen                  = 0;
-    int cmdlen                  = 0;
     struct docopt_term* term    = docopt_fetch_term(dS, hterm);
-    struct docopt_entries dE    = *dS->entries;
-    struct docopt_entries *oldE = dS->entries;
-    dE.nentries                 = dS->entries->nentries;
-    dE.entries                  = (struct docopt_entry*)calloc(sizeof(struct docopt_entry), dE.nentries);
-    memcpy(dE.entries, dS->entries->entries, sizeof(struct docopt_entry) * dE.nentries);
-    struct docopt_entry* entry  = docopt_entries_deref(&dE, term->entry);
-    dS->entries                 = &dE;
+    struct docopt_term* argterm = (dS->curarg < dS->argc)
+                                ? docopt_fetch_term(dS, dS->args_term + dS->curarg)
+                                : 0;
+    struct docopt_entry* terme  = docopt_fetch_entry(dS->entries, term->entry);
+    struct docopt_entry* terma  = argterm
+                                ? docopt_fetch_entry(dS->args, argterm->entry)
+                                : 0;
+    fprintf(dS->log, "%*s%s%s%s\n",
+        scale*indent, "",
+        DOCOPT_TYPE_NAMES[term->type],
+        term->optional ? "?" : " ",
+        term->repeat ? "..." : "   ");
+
+    if ((term->type != DOCOPT_TYPE_OPTION_SECTION) &&
+        !dS->optional && !dS->positional
+        && (dS->entries->flags & DOCOPT_NO_OPTIONS_FIRST))
+        docopt_unify_args(dS, 0);
 
     switch (term->type)
     {
-    case DOCOPT_TYPE_BAD        :
-        fprintf(dS->log, "%*s%s\n", indent+indentsc, "", "BAD");
+    case DOCOPT_TYPE_USAGE_SECTION      :
+        ++indent;
+        dS->curarg  = 0;
+        curarg      = 0;
+        for (int i = 1; i < term->length; i += docopt_fetch_term(dS, hterm+i)->length)
+            if (docopt_unify_args(dS, hterm+i))
+                break;
+        result  = dS->argc == dS->curarg;
+        --indent;
         break;
-docoptParseLong:
-    case DOCOPT_TYPE_LONG       :
+    case DOCOPT_TYPE_USAGE_STATEMENT    :
+        ++indent;
+        for (int i = 0; i < dS->argc; ++i)
+            dS->entries->args[i].owner  = 0;
+        dS->positional  = 0;
+        dS->optional    = 0;
+        result          = docopt_unify_args(dS, hterm+1);
+        dS->optional    = 1;
+        --indent;
+        break;
+    case DOCOPT_TYPE_EXPR               :
+        ++indent;
+        for (int i = 1; i < term->length; i += docopt_fetch_term(dS, hterm+i)->length)
+            if ((result = docopt_unify_args(dS, hterm+i)))
+                break;
+        --indent;
+        break;
+    case DOCOPT_TYPE_SEQ                :
+        ++indent;
+        for (int i = 1; i < term->length; i += docopt_fetch_term(dS, hterm+i)->length)
+            if (!(result = docopt_unify_args(dS, hterm+i)))
+                break;
+        --indent;
+        break;
+    case DOCOPT_TYPE_PNAME              :
+        result = 1;
+        break;
+    case DOCOPT_TYPE_OPTREF             :
+        ++indent;
+        docopt_unify_args(dS, 0);
+        result = 1;
+        --indent;
+        break;
+    case DOCOPT_TYPE_OPTION_SECTION     :
+        ++indent;
+        dS->optional    = 1;
+        for (int i = 1; i < term->length; i += docopt_fetch_term(dS, hterm+i)->length)
+            if ((result = docopt_unify_args(dS, hterm+i)))
+                break;
+        dS->optional    = 0;
+        --indent;
+        break;
+    case DOCOPT_TYPE_OPTION_STATEMENT   :
+        ++indent;
+        for (int i = 1; i < term->length; i += docopt_fetch_term(dS, hterm+i)->length)
+            if ((result = docopt_unify_args(dS, hterm+i)))
+                break;
+        --indent;
+        break;
+docoptUnifyShort:
+    case DOCOPT_TYPE_SHORT              :
         if (dS->curarg >= dS->argc) break;
-        if (strncmp(entry->name.fst, dS->argv[dS->curarg], docopt_str_len(&entry->name)))
+        if (argterm->type != DOCOPT_TYPE_SHORT) break;
+        if (strncmp(terme->short_name, terma->short_name, 2))
         {
-            if (entry->short_name[0] && (term->type == DOCOPT_TYPE_LONG))
-                goto docoptParseShort;
+            if ((term->type == DOCOPT_TYPE_SHORT) && terme->name.fst)
+                goto docoptUnifyLong;
             break;
         }
-        fprintf(dS->log, "%*sLONG %.*s\n", indent+indentsc, "", DOCOPT_PR((&entry->name)));
-        arglen  = strlen(dS->argv[dS->curarg]);
-        cmdlen  = docopt_str_len(&entry->name);
-        if (entry->command.fst)
+        if (terme->command.fst)
         {
-            fprintf(dS->log, "NEEDS COMMAND\n");
-            if ((cmdlen < arglen) && (dS->argv[dS->curarg][cmdlen] == '='))
+            if (!terma->command.fst)
             {
-                docopt_add_arg_list(dS, &dE, entry, 0, cmdlen+1, term->repeat);
-            }
-            else if ((dS->curarg + 1) < dS->argc)
-            {
-                docopt_add_arg_list(dS, &dE, entry, 1, 0, term->repeat);
+                if (dS->terms[dS->args_term+dS->curarg+1].type != DOCOPT_TYPE_ARGUMENT)
+                    break;
                 ++dS->curarg;
+                terma   = docopt_fetch_entry(dS->args, docopt_fetch_term(dS, dS->args_term + dS->curarg)->entry);
+                docopt_set_arg(dS->entries->args+dS->curarg, terme, &terma->name);
             }
-            else break;
+            else docopt_set_arg(dS->entries->args+dS->curarg, terme, &terma->command);
         }
-        else docopt_add_arg_list(dS, &dE, entry, 0, 0, term->repeat);
+        else docopt_set_arg(dS->entries->args+dS->curarg, terme, &terma->name);
         ++dS->curarg;
         result = 1;
         break;
-    case DOCOPT_TYPE_SHORTS     :
+docoptUnifyLong:
+    case DOCOPT_TYPE_LONG               :
         if (dS->curarg >= dS->argc) break;
-        if (dS->argv[dS->curarg][0] != '-') break;
-        if (dS->argv[dS->curarg][1] == '-') break;
-        fprintf(dS->log, "%*s%s(%d)\n", indent+indentsc, "", "SHORTS", docopt_fetch_term(dS, hterm)->length);
-        ++indent;
-        dS->curargoff = 0;
-        for (int i = 1; i < term->length; i += docopt_fetch_term(dS, hterm + i)->length)
-            if (docopt_parse_simple_backend(dS, hterm+i))
-                result = 1;
-        dS->curargoff = 0;
-        --indent;
-        break;
-docoptParseShort:
-    case DOCOPT_TYPE_SHORT      :
-        if (dS->curarg >= dS->argc) break;
-        if (dS->argv[dS->curarg][0] != '-') break;
-        if (dS->argv[dS->curarg][1] == '-') break;
-        if ((entry->short_name[1] != dS->argv[dS->curarg][dS->curargoff+1]) &&
-            strncmp(entry->short_name, dS->argv[dS->curarg], 2))
+        if (argterm->type != DOCOPT_TYPE_LONG) break;
+        if (strncmp(terme->name.fst, terma->name.fst, docopt_str_len(&terme->name)))
         {
-            if (entry->name.fst && (term->type == DOCOPT_TYPE_SHORT))
-                goto docoptParseLong;
+            if ((term->type == DOCOPT_TYPE_LONG) && terme->short_name[0])
+                goto docoptUnifyShort;
             break;
         }
-        fprintf(dS->log, "%*sSHORT %.*s == %s\n", indent+indentsc, "", 2, entry->short_name, dS->argv[dS->curarg]);
-        if (entry->command.fst)
+        if (terme->command.fst)
         {
-            if (strlen(dS->argv[dS->curarg]) == (dS->curargoff+2))
+            if (!terma->command.fst)
             {
-                docopt_add_arg_list(dS, &dE, entry, 0, dS->curargoff+2, term->repeat);
-                dS->curarg      += 2;
-            }
-            else
-            {
-                docopt_add_arg_list(dS, &dE, entry, 0, 2, term->repeat);
+                if (dS->terms[dS->args_term+dS->curarg+1].type != DOCOPT_TYPE_ARGUMENT)
+                    break;
                 ++dS->curarg;
+                terma   = docopt_fetch_entry(dS->args, docopt_fetch_term(dS, dS->args_term + dS->curarg)->entry);
+                docopt_set_arg(dS->entries->args+dS->curarg, terme, &terma->name);
             }
-            dS->curargoff   = 0;
+            else docopt_set_arg(dS->entries->args+dS->curarg, terme, &terma->command);
         }
-        else
-        {
-            docopt_add_arg_list(dS, &dE, entry, 0, 0, term->repeat);
-            if ((dS->curargoff+2) >= strlen(dS->argv[dS->curarg]))
-            {
-                dS->curargoff   = 0;
-                ++dS->curarg;
-            }
-            else ++dS->curargoff;
-        }
-        result = 1;
-        break;
-    case DOCOPT_TYPE_OPTREF     :
-        fprintf(dS->log, "%*s%s\n", indent+indentsc, "", "[options]");
-        ++indent;
-        docopt_parse_simple_backend(dS, 0);
-        result = 1;
-        --indent;
-        break;
-    case DOCOPT_TYPE_PNAME      :
-        fprintf(dS->log, "%*s%.*s\n", indent+indentsc, "", DOCOPT_PR((&entry->name)));
-        result = 1;
-        break;
-    case DOCOPT_TYPE_COMMAND    :
-        if (dS->curarg >= dS->argc) break;
-        fprintf(dS->log, "%*s%.*s\n", indent+indentsc, "", DOCOPT_PR((&entry->name)));
-        docopt_add_arg_list(dS, &dE, entry, 0, 0, term->repeat);
+        else docopt_set_arg(dS->entries->args+dS->curarg, terme, &terma->name);
         ++dS->curarg;
         result = 1;
         break;
-    case DOCOPT_TYPE_ARGUMENT   :
+    case DOCOPT_TYPE_ARGUMENT           :
         if (dS->curarg >= dS->argc) break;
-        if (!dS->positional && (strncmp(dS->argv[dS->curarg], "-", 1) == 0)) break;
-        fprintf(dS->log, "%*s%.*s\n", indent+indentsc, "", DOCOPT_PR((&entry->name)));
-        docopt_add_arg_list(dS, &dE, entry, 0, 0, term->repeat);
+        if (argterm->type != DOCOPT_TYPE_ARGUMENT) break;
+        docopt_set_arg(dS->entries->args+dS->curarg, terme, &terma->name);
         ++dS->curarg;
         result = 1;
         break;
-    case DOCOPT_TYPE_SEQ        :
-        fprintf(dS->log, "%*s%s%s(%d)\n", indent+indentsc, "", "SEQ", term->optional ? "?" : "", term->length);
-        ++indent;
+    case DOCOPT_TYPE_COMMAND            :
+        if (dS->curarg >= dS->argc) break;
+        if (argterm->type != DOCOPT_TYPE_ARGUMENT) break;
+        if (strncmp(terme->name.fst, terma->name.fst, docopt_str_len(&terme->name))) break;
+        if (!strcmp(terma->name.fst, "--")) dS->positional = 1;
+        docopt_set_arg(dS->entries->args+dS->curarg, terme, &terma->name);
+        ++dS->curarg;
         result = 1;
-        for (int i = 1; i < term->length; i += docopt_fetch_term(dS, hterm + i)->length)
-            if (!docopt_parse_simple_backend(dS, hterm+i))
-            {
-                result = 0;
-                break;
-            }
-        if (term->eat_all && (dS->curarg < dS->argc)) result = 0;
-        --indent;
-        break;
-    case DOCOPT_TYPE_EXPR       :
-        fprintf(dS->log, "%*s%s%s(%d)\n", indent+indentsc, "", "EXPR", term->optional ? "?" : "", term->length);
-        ++indent;
-        for (int i = 1; i < term->length; i += docopt_fetch_term(dS, hterm + i)->length)
-            if (docopt_parse_simple_backend(dS, hterm+i))
-            {
-                fprintf(dS->log, "%*s%s\n", (indent+1)*indentsc, "", "SUCCESS.");
-                result = 1;
-                break;
-            }
-        --indent;
-        break;
-    case DOCOPT_TYPE_MAX        :
-        fprintf(dS->log, "%*s%s\n", indent+indentsc, "", "MAX");
         break;
     }
 
     if (!result)
     {
-        dS->curarg  = curarg;
+        dS->positional  = 0;
+        for (int i = curarg; i < dS->argc; ++i)
+            dS->entries->args[i].owner  = 0;
+        dS->curarg      = curarg;
     }
-    else
+
+    if ((curarg < dS->curarg) && term->repeat && result)
     {
-        for (int i = 0; i < dE.nentries; ++i)
-        {
-            // XXX: unification is right-destructive.
-            oldE->entries[i].arg = dE.entries[i].arg;
-        }
+        docopt_unify_args(dS, hterm);
     }
 
-    if (term->repeat && (curarg < dS->curarg))
-    {
-        assert(curarg < dS->argc);
-        docopt_parse_simple_backend(dS, hterm);
-    }
+    fprintf(dS->log, "%*s%s\n",
+        scale*indent, "", result ? "PASSED" : "FAILED");
 
-    dS->entries = oldE;
-    free(dE.entries);
-
-    return result || term->optional;
+    return result;
 }
 
 static int docopt_parse_args(struct docopt_parse_state* dS)
 {
-    if (dS->entries->flags | DOCOPT_SIMPLE_BACKEND)
+    // options* commands* -- arguments*
+    struct docopt_entries argE  = *dS->entries;
+    struct docopt_entries *docE = dS->entries;
+    int result                  = 0;
+    int hterm                   = 0;
+    struct docopt_str arg       = { 0, 0 };
+    struct docopt_entry entry   = { { 0 } };
+    argE.nentries               = dS->argc+1;
+    argE.curentry               = 0;
+    if (!(argE.entries = (struct docopt_entry*)calloc(sizeof(struct docopt_entry), dS->argc+1)))
+        goto docoptDone;
+    dS->entries                 = &argE;
+
+    dS->args_term               = dS->curterm;
+    for (int i = 0; i < dS->argc; ++i)
     {
-        return !docopt_parse_simple_backend(dS, dS->usage_term);
+        arg.fst         = dS->argv[i];
+        arg.lst         = dS->argv[i] + strlen(dS->argv[i]);
+        if (!strcmp(dS->argv[i], "--") || (dS->argv[i][0] != '-') || dS->positional)
+        {
+            if (!strcmp(dS->argv[i], "--")) dS->positional = 1;
+            hterm       = docopt_new_term(dS, DOCOPT_TYPE_ARGUMENT);
+            docopt_fetch_term(dS, hterm)->length = 1;
+            entry.name.fst  = dS->argv[i];
+            entry.name.lst  = dS->argv[i] + strlen(dS->argv[i]);
+            docopt_fetch_term(dS, hterm)->entry = docopt_entries_insert_entry(dS->entries, &entry);
+        }
+        else
+            docopt_parse_atom(dS, &arg);
     }
-    return 1;
+
+    dS->optional    = 1;
+    dS->positional  = 0;
+    dS->entries     = docE;
+    dS->args        = &argE;
+    result          = docopt_unify_args(dS, dS->usage_term);
+
+docoptDone:
+    dS->entries                 = docE;
+    if (argE.entries) free(argE.entries);
+    return !result;
 }
 
 void docopt_print_help(struct docopt_parse_state* dS, char* version, int moreInfo)
@@ -857,16 +869,14 @@ docopt_t docopt(const char* doc, int argc, char** argv, char* version, unsigned 
 
     dE      = dS.entries;
 
+docoptFail:
     for (int i = 0; (i < argc) && !(flags & DOCOPT_NO_HELP); ++i)
         if (!strncmp(argv[i], "--help", 6) || !strncmp(argv[i], "-h", 2))
         {
             docopt_print_help(&dS, version, 1);
-            break;
+            return dE;
         }
-    if (argc == 0) docopt_print_help(&dS, version, 0);
-
-docoptFail:
-    if (!dE) docopt_print_help(&dS, version, 0);
+    if ((argc == 0) || !dE) docopt_print_help(&dS, version, 0);
     docopt_parse_state_free(&dS);
     return dE;
 }
@@ -878,19 +888,21 @@ int docopt_error(docopt_t doc)
 
 docopt_str_t* docopt_get(docopt_t doc, const char* cmd, int idx)
 {
-    struct docopt_entries* dE   = doc;
-    struct docopt_str str       = { .fst = cmd, .lst = cmd + strlen(cmd) };
-    struct docopt_arg* arg      = 0;
-    int hentry  = docopt_entries_get_entry(dE, &str);
-    if (hentry < 0) return 0;
-    arg = docopt_entries_deref(dE, hentry)->arg;
-    while ((idx > 0) && arg)
-    {
-        --idx;
-        arg = arg->next;
-    }
-    if (arg) return &arg->value;
-    return 0;
+    struct docopt_entries* dE   = (struct docopt_entries*)doc;
+    struct docopt_str str       = { cmd, cmd + strlen(cmd) };
+    struct docopt_entry* owner  = 0;
+    struct docopt_str* result   = 0;
+    int entry                   = 0;
+    if ((entry = docopt_entries_get_entry(dE, &str)) < 0)
+        return 0;
+    owner                       = docopt_fetch_entry(dE, entry);
+    for (int i = 0; (i < dE->nargs) && (idx >= 0); ++i)
+        if (dE->args[i].owner == owner)
+        {
+            result  = &dE->args[i].value;
+            --idx;
+        }
+    return (idx < 0) ? result : (owner->defvalue.fst ? &owner->defvalue : 0);
 }
 
 void docopt_free(docopt_t doc)

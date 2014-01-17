@@ -27,7 +27,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #define DOCOPT_C
-#define DOCOPT_DEBUG
+//#define DOCOPT_DEBUG
 #include "docopt.h"
 
 int main(int argc, char **argv)
@@ -35,17 +35,11 @@ int main(int argc, char **argv)
     const char msg[] =
     "Usage:\n"
     "    docopt [options] DOCSTR ARGC ARGV...\n"
-    "    docopt (-h | --help | --version=<N> | -bacdexlFOO)\n"
-    "    docopt -fjo\n"
-    "    docopt doc STR\n"
-    "Options:\n"
-    "    -h, --help\n"
-    "    -v --version N\n"
+    "    docopt (-h | --help | --version)\n"
+    "    docopt --pptions=<DIR>"
     "\n"
-    "Mature Options:\n"
-    "    -o --options=<ORDER>   Which order the options occur in [default: regular].\n"
-    "    -lFOO                  MoF.\n"
-    "    -p                     Print.\n"
+    "Options:\n"
+    "    -p, --print FILE   The file to print [default: driver@].\n"
     ;
     int i = 0;
 
@@ -68,6 +62,7 @@ int main(int argc, char **argv)
         fprintf(stdout, "Has -j? %s\n", docopt_get(opts, "-j", 0) ? docopt_get(opts, "-j", 0)->fst : "no");
         fprintf(stdout, "Has -k? %s\n", docopt_get(opts, "-k", 0) ? docopt_get(opts, "-k", 0)->fst : "no");
         fprintf(stdout, "Has -o? %s\n", docopt_get(opts, "-o", 0) ? docopt_get(opts, "-o", 0)->fst : "no");
+        fprintf(stdout, "Has -p? %s\n", docopt_get(opts, "-p", 0) ? docopt_get(opts, "-p", 0)->fst : "no");
     }
     docopt_free(opts);
 

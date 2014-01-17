@@ -11,7 +11,7 @@ The design of docoptc contains two broad phases:
   1. document string parsing; and,
   2. argument parsing.
 
-The first phase is (fairly) well-defined by the docopt.org website. The second phase is undefined, other than reference code. Docoptc has no intention of porting the second (undefined) phase and can be considered a mere *variant*, and not a fully functioning port. However, the design of docoptc is such that more argument-parsing backends can be integrated---possibly even a docopt.org-compliant version.
+Both phases are (fairly) well-defined by the docopt.org website. However, the design of docoptc is such that more-than-one argument-parsing backends can be integrated.
 
 ##### Document string parsing
 
@@ -33,7 +33,9 @@ An option statement begins with a SHORT, an optional comma (,), and an optional 
 
 The usage section uses the following (rough) grammar:
 
-    USAGE-SECTION ::= EXPR
+    USAGE-SECTION ::= USAGE-STMT
+    USAGE-SECTION ::= USAGE-STMT USAGE-SECTION
+       USAGE-STMT ::= EXPR/SEQ/(PNAME ...)
              EXPR ::= SEQ
              EXPR ::= SEQ `|` EXPR
               SEQ ::= ATOM
@@ -55,24 +57,18 @@ The usage section uses the following (rough) grammar:
          ARGUMENT ::= `<` `[^>]+` `>`
           COMMAND ::= not `...`, not whitespace, etc.
 
+The resulting AST defines a grammar for parsing arguments.
+
 ##### Arguments parsing
 
-Currently, docoptc uses the AST defined by the parsing of the usage- and options- sections to form a parsing-expression-grammar. **This parsing is known to be non-compliant with docopt.org; it is also incomplete in its own definition**. This grammar is interpreted with the following (rough) semantics:
+Arguments are first classified as either a LONG, a SHORT, or an ARGUMENT; LONGs and SHORTs are parsed, as above. If the ARGUMENT `--` is seen in the arguments, then all subsequent arguments are classified as ARGUMENT. (The docopt reference refers to this as argument tokenization.)
 
-              [| EXPR |] === one of the branches must succeed
-               [| SEQ |] === each element of the sequence must succeed, in order
-              [| ATOM |] === the atom must succeed
-        [| ATOM `...` |] === as atom, but one-or-more times
-      [| `[` EXPR `]` |] === as [|EXPR|], but success always occurs;
-                             combined with `...`, care must be made with *progress*
-      [| `(` EXPR `)` |] === [| EXPR |]
-             [| SHORT |] === must parse a short; see note about "stacked shorts"
-    [| SHORT ARGUMENT |] === must parse a short, followed by an argument;
-                             see note about "stacked shorts"
-              [| LONG |] === must parse a long
-     [| LONG ARGUMENT |] === must parse a long, followed by an argument
-          [| ARGUMENT |] === must parse an argument
-           [| COMMAND |] === must parse a command
+The final stage is to unify the tokenized arguments against the grammar defined by the parsed document string. This is done by letting the document string grammar be interpreted as a parsing expression grammar.
 
-"Stacked shorts" allow a (predefined) sequence of shorts to be parsed. It essentially adds an EXPR-like branch, except that some (non-contiguous) subset of the short-sequence must be parsed.
+The option 'options first' enforces that all 'loose' options defined in the options sections are parsed *before* the command section; otherwise, they may occur, interspersed. That is, there are two parsing sequences:
 
+    [ LONG | SHORT ]* [ ARGUMENT ]* [ '--' [ ARGUMENT ]* ];
+
+and:
+
+    [ LONG | SHORT | ARGUMENT ]* [ '--' [ ARGUMENT ]* ].
