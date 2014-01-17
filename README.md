@@ -1,7 +1,7 @@
 DOCOPTC
 =======
 
-Docoptc is a [docopt](docopt.org) *variant*, not a port.
+Docoptc is a [docopt](http://docopt.org) *variant*, not a port.
 
 
 #### Docoptc design
@@ -75,4 +75,4 @@ Currently, docoptc uses the AST defined by the parsing of the usage- and options
            [| COMMAND |] === must parse a command
 
 "Stacked shorts" allow a (predefined) sequence of shorts to be parsed. It essentially adds an EXPR-like branch, except that some (non-contiguous) subset of the short-sequence must be parsed.
-    
+
