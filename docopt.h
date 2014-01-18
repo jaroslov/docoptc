@@ -98,7 +98,7 @@ DOCOPT_TYPE_TBL(DOCOPT_TYPE_NAME)
 
 static regmatch_t docopt_pmatches[DOCOPT_NUM_PMATCHES];
 
-#define DOCOPT_PR(str) docopt_str_len(str), str->fst
+#define DOCOPT_PR(str) docopt_str_len((str)), (str)->fst
 
 struct docopt_entry
 {
