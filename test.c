@@ -27,7 +27,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #define DOCOPT_C
-//#define DOCOPT_DEBUG
+#define DOCOPT_DEBUG
 #include "docopt.h"
 
 struct docopt_check
@@ -241,6 +241,84 @@ const char *usages[] =
     "Usage: test ARGC [ARGV...]",
     "Usage: test ARGC [ARGV]...",
     "Usage: test cmd ARGC ARGV...",
+    /* 64 */
+    "Usage: test <arg-c> <arg-v>...",
+    "Usage: test <arg-c> [<arg-v>...]",
+    "Usage: test <arg-c> [<arg-v>]...",
+    "Usage: test cmd <arg-c> <arg-v>...",
+    /* 68 */
+    "Usage: arguments_example.py [-vqrh] [FILE] ...\n"
+    "          arguments_example.py (--left | --right) CORRECTION FILE\n"
+    "\n"
+    "Process FILE and optionally apply correction to either left-hand side or\n"
+    "right-hand side.\n"
+    "\n"
+    "Arguments:\n"
+    "  FILE        optional input file\n"
+    "  CORRECTION  correction angle, needs FILE, --left or --right to be present\n"
+    "\n"
+    "Options:\n"
+    "  -h --help\n"
+    "  -v       verbose mode\n"
+    "  -q       quiet mode\n"
+    "  -r       make report\n"
+    "  --left   use left-hand side\n"
+    "  --right  use right-hand side\n",
+    /* 69 */
+    "Not a serious example.\n"
+    "\n"
+    "Usage:\n"
+    "  calculator_example.py <value> ( ( + | - | * | / ) <value> )...\n"
+    "  calculator_example.py <function> <value> [( , <value> )]...\n"
+    "  calculator_example.py (-h | --help)\n"
+    "\n"
+    "Examples:\n"
+    "  calculator_example.py 1 + 2 + 3 + 4 + 5\n"
+    "  calculator_example.py 1 + 2 '*' 3 / 4 - 5    # note quotes around '*'\n"
+    "  calculator_example.py sum 10 , 20 , 30 , 40\n"
+    "\n"
+    "Options:\n"
+    "  -h, --help\n",
+    /* 70 */
+    "Usage: counted_example.py --help\n"
+    "       counted_example.py -v...\n"
+    "       counted_example.py go [go]\n"
+    "       counted_example.py (--path=<path>)...\n"
+    "       counted_example.py <file> <file>\n"
+    "\n"
+    "Try: counted_example.py -vvvvvvvvvv\n"
+    "     counted_example.py go go\n"
+    "     counted_example.py --path ./here --path ./there\n"
+    "     counted_example.py this.txt that.txt\n",
+    /* 71 */
+    "This example uses docopt with the built in cmd module to demonstrate an\n"
+    "interactive command application.\n"
+    "\n"
+    "Usage:\n"
+    "    my_program tcp <host> <port> [--timeout=<seconds>]\n"
+    "    my_program serial <port> [--baud=<n>] [--timeout=<seconds>]\n"
+    "    my_program (-i | --interactive)\n"
+    "    my_program (-h | --help | --version)\n"
+    "\n"
+    "Options:\n"
+    "    -i, --interactive  Interactive Mode\n"
+    "    -h, --help  Show this screen and exit.\n"
+    "    --baud=<n>  Baudrate [default: 9600]\n",
+    /* 72 */
+    "Usage:\n"
+    "  naval_fate.py ship new <name>...\n"
+    "  naval_fate.py ship <name> move <x> <y> [--speed=<kn>]\n"
+    "  naval_fate.py ship shoot <x> <y>\n"
+    "  naval_fate.py mine (set|remove) <x> <y> [--moored|--drifting]\n"
+    "  naval_fate.py -h | --help\n"
+    "  naval_fate.py --version\n"
+    "\n"
+    "Options:\n"
+    "  -h --help     Show this screen.\n"
+    "  --version     Show version.\n"
+    "  --speed=<kn>  Speed in knots [default: 10].\n"
+    "  --moored      Moored (anchored) mine.\n"
+    "  --drifting    Drifting mine.\n",
 };
 
 const struct docopt_test tests[] =
@@ -346,7 +424,53 @@ const struct docopt_test tests[] =
     { 60, { "A0", "A1", "A2", "A3" },       { { "ARGC", 0, "A0" }, { "ARGV", 0, "A1" }, { "ARGV", 1, "A2" }, { "ARGV", 2, "A3" } } },
     { 61, { "A0" },                         { { "ARGC", 0, "A0" } } },
     { 62, { "A0" },                         { { "ARGC", 0, "A0" } } },
-    { 63, { "cmd", "A0" },                  { { "cmd", 0, 0 }, { "ARGC", 0, "A0" } } },
+    { 63, { "cmd", "A0", "A1" },            { { "cmd", 0, 0 }, { "ARGC", 0, "A0" }, { "ARGV", 0, "A1" } } },
+
+    { 64, { "A0", "A1", "A2", "A3" },       { { "<arg-c>", 0, "A0" }, { "<arg-v>", 0, "A1" }, { "<arg-v>", 1, "A2" }, { "<arg-v>", 2, "A3" } } },
+    { 65, { "A0" },                         { { "<arg-c>", 0, "A0" } } },
+    { 66, { "A0" },                         { { "<arg-c>", 0, "A0" } } },
+    { 67, { "cmd", "A0", "A1" },            { { "cmd", 0, 0 }, { "<arg-c>", 0, "A0" }, { "<arg-v>", 0, "A1" } } },
+
+    { 68, { "--help" },                     { } },
+    { 68, { "-v", "FOO" },                  { { "-v", 0, 0 }, { "FILE", 0, "FOO" } } },
+    { 68, { "-q", "FOO" },                  { { "-q", 0, 0 }, { "FILE", 0, "FOO" } } },
+    { 68, { "-r", "FOO" },                  { { "-r", 0, 0 }, { "FILE", 0, "FOO" } } },
+    { 68, { "--left", "FOO", "BAR" },       { { "--left", 0, 0 }, { "CORRECTION", 0, "FOO" }, { "FILE", 0, "BAR" } } },
+    { 68, { "--right", "FOO", "BAR" },      { { "--right", 0, 0 }, { "CORRECTION", 0, "FOO" }, { "FILE", 0, "BAR" } } },
+
+    { 69, { "--help" },                     { } },
+    { 69, { "1", "+", "2" },                { { "<value>", 0, "1" }, { "<value>", 1, "2" } } },
+    { 69, { "3", "+", "4", "-", "5" },      { { "<value>", 0, "3" }, { "<value>", 1, "4" }, { "<value>", 2, "5" } } },
+    { 69, { "sum", "10", ",", "20" },       { { "<function>", 0, "sum" }, { "<value>", 0, "10" }, { "<value>", 1, "20" } } },
+
+    { 70, { "--help" },                     { } },
+    { 70, { "-vvvvv"},                      { { "-v", 0, 0 }, { "-v", 1, 0 }, { "-v", 2, 0 }, { "-v", 3, 0 }, { "-v", 4, 0 } } },
+    { 70, { "go", "go" },                   { { "go", 0, 0 }, { "go", 1, 0 } } },
+    { 70, { "--path", "./here", "--path", "./there"}, { { "--path", 0, "./here"}, { "--path", 1, "./there"}, } },
+    { 70, { "this.txt", "that.txt" },       { { "<file>", 0, "this.txt" }, { "<file>", 1, "that.txt" } } },
+
+    { 71, { "--help" },                     { } },
+    { 71, { "tcp", "google.com", "8080" },  { { "tcp", 0, 0}, { "<host>", 0, "google.com" }, { "<port>", 0, "8080" } } },
+    { 71, { "tcp", "google.com", "8080", "--timeout=1000ms" },  { { "tcp", 0, 0}, { "<host>", 0, "google.com" }, { "<port>", 0, "8080" }, { "--timeout", 0, "1000ms" } } },
+    { 71, { "serial", "8080" },             { { "serial", 0, 0}, { "<port>", 0, "8080" } } },
+    { 71, { "serial", "8080" },             { { "serial", 0, 0}, { "<port>", 0, "8080" }, { "--baud", 0, "9600" } } },
+    { 71, { "serial", "8080", "--baud", "1200" }, { { "serial", 0, 0}, { "<port>", 0, "8080" }, { "--baud", 0, "1200" } } },
+    { 71, { "serial", "8080", "--timeout", "5000ms" }, { { "serial", 0, 0}, { "<port>", 0, "8080" }, { "--baud", 0, "9600" }, { "--timeout", 0, "5000ms" } } },
+    { 71, { "--interactive" },              { { "--interactive", 0, 0 } } },
+    { 71, { "--interactive" },              { { "-i", 0, 0 } } },
+    { 71, { "-i" },                         { { "--interactive", 0, 0 } } },
+    { 71, { "-i" },                         { { "-i", 0, 0 } } },
+
+    { 72, { "--help" },                     { } },
+    { 72, { "ship", "new", "USS Enterprise", "USS Kennedy" }, { { "ship", 0, 0 }, { "new", 0, 0 }, { "<name>", 0, "USS Enterprise" }, { "<name>", 1, "USS Kennedy" } } },
+    { 72, { "ship", "USS Enterprise", "move", "10", "20" }, { { "ship", 0, 0 }, { "<name>", 0, "USS Enterprise" } } },
+    { 72, { "ship", "USS Enterprise", "move", "10", "20" }, { { "ship", 0, 0 }, { "<name>", 0, "USS Enterprise" }, { "--speed", 0, "10" } } },
+    { 72, { "ship", "USS Enterprise", "move", "10", "20", "--speed=11.3" }, { { "ship", 0, 0 }, { "<name>", 0, "USS Enterprise" }, { "--speed", 0, "11.3" } } },
+    { 72, { "ship", "shoot", "3", "4" },    { { "ship", 0, 0 }, { "shoot", 0, 0 }, { "<x>", 0, "3" }, { "<y>", 0, "4" } } },
+    //mine (set|remove) <x> <y> [--moored|--drifting]
+    { 72, { "mine", "set", "10", "12" },    { { "mine", 0, 0}, { "set", 0, 0 }, { "<x>", 0, "10" }, { "<y>", 0, "12" } } },
+    { 72, { "mine", "set", "10", "12", "--moored" }, { { "mine", 0, 0}, { "set", 0, 0 }, { "<x>", 0, "10" }, { "<y>", 0, "12" }, { "--moored", 0, 0 } } },
+    { 72, { "mine", "set", "10", "12", "--drifting" }, { { "mine", 0, 0}, { "set", 0, 0 }, { "<x>", 0, "10" }, { "<y>", 0, "12" }, { "--drifting", 0, 0 } } },
 };
 
 int check_test(docopt_t doc, int test);
@@ -367,6 +491,9 @@ int main(int argc, char **argv)
         {
             low         = strtoul(docopt_get(doc, "N", 0)->fst, 0, 0);
             high        = low + 1;
+            fprintf(stdout, "ARGS\n");
+            for (int j = 0; tests[low].args[j]; ++j)
+                fprintf(stdout, "    %s\n", tests[low].args[j]);
         }
     }
     else
