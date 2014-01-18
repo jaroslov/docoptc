@@ -1,5 +1,8 @@
 all:
-	clang -g -I. docopt.c -o docc -Wall -Werror
+	clang -g -I. test.c -o test -Wall -Werror
 
 clean:
-	rm -rf docc docc.dSYM
+	rm -rf test test.dSYM
+
+check: clean all
+	./test self-test

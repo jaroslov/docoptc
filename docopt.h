@@ -41,6 +41,9 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
 #define DOCOPT_NO_OPTIONS_FIRST     0x2
 #define DOCOPT_OPTIONS_FIRST        0x0
 
+#define PRdocS                      "%.*s"
+#define DOCOPT_PR(str)              docopt_str_len((str)), (str)->fst
+
 typedef void* docopt_t;
 typedef struct docopt_str { const char* fst; const char* lst; } docopt_str_t;
 
@@ -97,8 +100,6 @@ DOCOPT_TYPE_TBL(DOCOPT_TYPE_NAME)
 #define DOCOPT_REPEAT                       "..."
 
 static regmatch_t docopt_pmatches[DOCOPT_NUM_PMATCHES];
-
-#define DOCOPT_PR(str) docopt_str_len((str)), (str)->fst
 
 struct docopt_entry
 {
@@ -357,8 +358,11 @@ static int docopt_parse_options(struct docopt_parse_state* dS)
     optstmt.fst                 = dS->option_section.fst;
 
     options_x                   = docopt_new_term(dS, DOCOPT_TYPE_OPTION_SECTION);
+    docopt_fetch_term(dS, options_x)->repeat    = 1;
+    docopt_fetch_term(dS, options_x)->optional  = 1;
     while (!docopt_get_section(dS, &dS->re_option_statement_start, &dS->re_option_statement_start, optstmt.fst, &optstmt, 3, 0))
     {
+        fprintf(dS->log, "%s\n", "Parsing Option Statement.");
         sterm           = -1;
         lterm           = -1;
         which_first     = 0;
@@ -408,6 +412,7 @@ docoptAddOption:
         if (lterm >= 0) docopt_fetch_term(dS, lterm)->entry = docopt_entries_insert_entry(dS->entries, &option);
         if (sterm >= 0) docopt_fetch_term(dS, sterm)->entry = docopt_entries_insert_entry(dS->entries, &option);
         docopt_fetch_term(dS, options_s)->length = dS->curterm - options_s;
+        fprintf(dS->log, "%s\n", "... Done Parsing Option Statement.");
     }
     docopt_fetch_term(dS, options_x)->length = dS->curterm - options_x;
     for (int i = 0, idx = 0, jdx = 0, entry; i < strlen(unarged_shorts); ++i)
@@ -419,11 +424,15 @@ docoptAddOption:
         else
             dS->arged_shorts[jdx++]     = short_name[1];
     }
-    sprintf(&re_arged_shorts[0], "^" DOCOPT_RE_ARGED_SHORTS, dS->unarged_shorts, dS->arged_shorts);
-    if (regcomp(&dS->re_arged_shorts, re_arged_shorts, REG_EXTENDED))
+    if (strlen(dS->arged_shorts))
     {
-        dS->entries->error  = DOCOPT_BAD_ARGED_SHORTS;
-        return 1;
+        fprintf(dS->log, "Setting up arged shorts: %s\n", dS->arged_shorts);
+        sprintf(&re_arged_shorts[0], "^" DOCOPT_RE_ARGED_SHORTS, dS->unarged_shorts, dS->arged_shorts);
+        if (regcomp(&dS->re_arged_shorts, re_arged_shorts, REG_EXTENDED))
+        {
+            dS->entries->error  = DOCOPT_BAD_ARGED_SHORTS;
+            return 1;
+        }
     }
     return 0;
 }
@@ -682,6 +691,7 @@ static int docopt_unify_args(struct docopt_parse_state* dS, int hterm)
         --indent;
         break;
     case DOCOPT_TYPE_OPTION_SECTION     :
+        if (dS->curarg >= dS->argc) break;
         ++indent;
         dS->optional    = 1;
         for (int i = 1; i < term->length; i += docopt_fetch_term(dS, hterm+i)->length)
@@ -691,10 +701,11 @@ static int docopt_unify_args(struct docopt_parse_state* dS, int hterm)
         --indent;
         break;
     case DOCOPT_TYPE_OPTION_STATEMENT   :
+        if (dS->curarg >= dS->argc) break;
         ++indent;
         for (int i = 1; i < term->length; i += docopt_fetch_term(dS, hterm+i)->length)
-            if ((result = docopt_unify_args(dS, hterm+i)))
-                break;
+            if (docopt_unify_args(dS, hterm+i))
+                result  = 1;
         --indent;
         break;
 docoptUnifyShort:
@@ -834,6 +845,7 @@ docoptDone:
 void docopt_print_help(struct docopt_parse_state* dS, char* version, int moreInfo)
 {
     dS->entries->error  = DOCOPT_PRINTED_HELP;
+    if (dS->entries->flags & DOCOPT_NO_HELP) return;
     if (!version)
     {
         if (moreInfo)
@@ -856,21 +868,28 @@ docopt_t docopt(const char* doc, int argc, char** argv, char* version, unsigned 
     struct docopt_parse_state   dS  = { 0 };
     struct docopt_entries*      dE  = 0;
     if (docopt_parse_state_init(&dS, doc, argc, argv, version, flags)) goto docoptFail;
+    fprintf(dS.log, "%s", "Getting Usage Section.\n");
     if (docopt_get_section(&dS, &dS.re_usage_section_start, &dS.re_option_section_start, dS.entries->docstr.fst, &dS.usage_section, 0, 0)) goto docoptFail;
+    fprintf(dS.log, "%s", "Getting Usage PNAME... ");
     if (regexec(&dS.re_pname, dS.usage_section.fst, DOCOPT_NUM_PMATCHES, &docopt_pmatches[0], 0)) return 0;
+    fprintf(dS.log, "" PRdocS "\n", DOCOPT_PR(&dS.pname));
     dS.pname.fst    = docopt_pmatches[2].rm_so + dS.usage_section.fst;
     dS.pname.lst    = docopt_pmatches[2].rm_eo + dS.usage_section.fst;
+    fprintf(dS.log, "%s", "Getting Parse Options.\n");
     if (docopt_parse_options(&dS)) goto docoptFail;
+    fprintf(dS.log, "%s", "Getting Parse Usage.\n");
     if (docopt_parse_usage(&dS)) goto docoptFail;
+    fprintf(dS.log, "%s", "Getting Parse Args.\n");
     if (argc && docopt_parse_args(&dS))
     {
         goto docoptFail;
     }
 
+    fprintf(dS.log, "%s", "Success!\n");
     dE      = dS.entries;
 
 docoptFail:
-    for (int i = 0; (i < argc) && !(flags & DOCOPT_NO_HELP); ++i)
+    for (int i = 0; i < argc; ++i)
         if (!strncmp(argv[i], "--help", 6) || !strncmp(argv[i], "-h", 2))
         {
             docopt_print_help(&dS, version, 1);
@@ -899,10 +918,17 @@ docopt_str_t* docopt_get(docopt_t doc, const char* cmd, int idx)
     for (int i = 0; (i < dE->nargs) && (idx >= 0); ++i)
         if (dE->args[i].owner == owner)
         {
-            result  = &dE->args[i].value;
+            if (dE->args[i].value.fst)
+                result  = &dE->args[i].value;
+            else
+                result  = &owner->defvalue;
             --idx;
         }
-    return (idx < 0) ? result : (owner->defvalue.fst ? &owner->defvalue : 0);
+    if ((idx >= 0) && owner->defvalue.fst)
+    {
+        return &owner->defvalue;
+    }
+    return (idx < 0) ? result : 0;
 }
 
 void docopt_free(docopt_t doc)
