@@ -1,8 +1,26 @@
 DOCOPTC
 =======
 
-Docoptc is a [docopt](http://docopt.org) *variant*, not a port.
+Docoptc is a [docopt](http://docopt.org) *variant*, not a port. However, it can currently consume all the examples given in the python reference implementation.
 
+#### Docoptc building & using
+
+Docoptc is a single, combined, header and source file. To use as a header file, simply include it as usual:
+
+    #include "docopt.h"
+
+To use it as a source file, define "DOCOPT_C", and include the file:
+
+    #define DOCOPT_C
+    #include "docopt.h"
+
+If you feel there is a bug (not unlikely), then debugging can be turned on, as well:
+
+    #define DOCOPT_C
+    #define DOCOPT_DEBUG
+    #include "docopt.h"
+
+Docoptc is known to compile with [clang](http://clang.llvm.org).
 
 #### Docoptc design
 
