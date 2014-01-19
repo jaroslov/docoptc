@@ -48,7 +48,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
 typedef void* docopt_t;
 typedef struct docopt_str { const char* fst; const char* lst; } docopt_str_t;
 
-docopt_t docopt(const char* doc, int argc, char** argv, char* version, unsigned int flags);
+docopt_t docopt(const char* doc, int argc, char** argv, unsigned int flags);
 docopt_str_t* docopt_get(docopt_t, const char*, int);
 int docopt_error(docopt_t);
 void docopt_free(docopt_t);
@@ -122,7 +122,6 @@ struct docopt_entries
     int                     error;
 
     struct docopt_str       docstr;
-    char*                   version;
     unsigned int            flags;
 
     int                     nentries;
@@ -275,7 +274,7 @@ static void docopt_parse_state_free(struct docopt_parse_state* dS)
     regfree(&dS->re_optref); regfree(&dS->re_usage_section_start);
 }
 
-static int docopt_parse_state_init(struct docopt_parse_state* dS, const char* doc, int argc, char **argv, char* version, unsigned int flags)
+static int docopt_parse_state_init(struct docopt_parse_state* dS, const char* doc, int argc, char **argv, unsigned int flags)
 {
 #if defined(DOCOPT_DEBUG)
     dS->log                         = stdout;
@@ -288,7 +287,6 @@ static int docopt_parse_state_init(struct docopt_parse_state* dS, const char* do
     dS->curarg                      = 0;
     dS->entries->docstr.fst         = doc;
     dS->entries->docstr.lst         = doc + strlen(doc);
-    dS->entries->version            = version;
     dS->entries->flags              = flags;
     dS->entries->nentries           = 2;
     dS->entries->curentry           = 1;
@@ -905,7 +903,7 @@ static int docopt_parse_args(struct docopt_parse_state* dS)
 
     dS->nargterms       = dS->curterm - dS->args_term;
     dS->entries->nargs  = dS->nargterms;
-    fprintf(stdout, "Tokenized Args Length (%d)\n", dS->entries->nargs);
+    fprintf(dS->log, "Tokenized Args Length (%d)\n", dS->entries->nargs);
     if (!(dS->entries->args = (struct docopt_arg*)calloc(sizeof(struct docopt_arg), dS->entries->nargs)))
     {
         dS->entries->error = DOCOPT_BAD_ARG_ALLOC;
@@ -920,32 +918,28 @@ docoptDone:
     return !result;
 }
 
-void docopt_print_help(struct docopt_parse_state* dS, char* version, int moreInfo)
+void docopt_print_help(struct docopt_parse_state* dS, int moreInfo)
 {
     dS->entries->error  = DOCOPT_PRINTED_HELP;
     if (dS->entries->flags & DOCOPT_NO_HELP) return;
-    if (!version)
+    if (moreInfo)
     {
-        if (moreInfo)
-        {
-            docopt_strip(&dS->entries->docstr, "\n");
-            fprintf(stderr, "%.*s\n", DOCOPT_PR((&dS->entries->docstr)));
-        }
-        else
-        {
-            fprintf(stderr, "%s", "Usage:\n");
-            docopt_strip(&dS->usage_section, "\n");
-            fprintf(stderr, "%.*s\n", DOCOPT_PR((&dS->usage_section)));
-        }
+        docopt_strip(&dS->entries->docstr, "\n");
+        fprintf(stderr, "%.*s\n", DOCOPT_PR((&dS->entries->docstr)));
     }
-    else fprintf(stderr, "%s", version);
+    else
+    {
+        fprintf(stderr, "%s", "Usage:\n");
+        docopt_strip(&dS->usage_section, "\n");
+        fprintf(stderr, "%.*s\n", DOCOPT_PR((&dS->usage_section)));
+    }
 }
 
-docopt_t docopt(const char* doc, int argc, char** argv, char* version, unsigned int flags)
+docopt_t docopt(const char* doc, int argc, char** argv, unsigned int flags)
 {
     struct docopt_parse_state   dS  = { 0 };
     struct docopt_entries*      dE  = 0;
-    if (docopt_parse_state_init(&dS, doc, argc, argv, version, flags)) goto docoptFail;
+    if (docopt_parse_state_init(&dS, doc, argc, argv, flags)) goto docoptFail;
     fprintf(dS.log, "%s", "Getting Usage Section.\n");
     if (docopt_get_section(&dS, &dS.re_usage_section_start, &dS.re_usage_section_stop, dS.entries->docstr.fst, &dS.usage_section, 0, 0)) goto docoptFail;
     fprintf(dS.log, "%s", "Getting Usage PNAME... ");
@@ -970,10 +964,10 @@ docoptFail:
     for (int i = 0; i < argc; ++i)
         if (!strncmp(argv[i], "--help", 6) || !strncmp(argv[i], "-h", 2))
         {
-            docopt_print_help(&dS, version, 1);
+            docopt_print_help(&dS, 1);
             return dE;
         }
-    if ((argc == 0) || !dE) docopt_print_help(&dS, version, 0);
+    if ((argc == 0) || !dE) docopt_print_help(&dS, 0);
     docopt_parse_state_free(&dS);
     return dE;
 }

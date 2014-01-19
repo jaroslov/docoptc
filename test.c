@@ -27,7 +27,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #define DOCOPT_C
-#define DOCOPT_DEBUG
+//#define DOCOPT_DEBUG
 #include "docopt.h"
 
 struct docopt_check
@@ -319,6 +319,46 @@ const char *usages[] =
     "  --speed=<kn>  Speed in knots [default: 10].\n"
     "  --moored      Moored (anchored) mine.\n"
     "  --drifting    Drifting mine.\n",
+    /* 73 */
+    "Usage: odd_even_example.py [-h | --help] (ODD EVEN)...\n"
+    "\n"
+    "Example, try:\n"
+    "  odd_even_example.py 1 2 3 4\n"
+    "\n"
+    "Options:\n"
+    "  -h, --help\n",
+    /* 74 */
+    "Example of program with many options using docopt.\n"
+    "\n"
+    "Usage:\n"
+    "  options_example.py [-hvqrf NAME] [--exclude=PATTERNS]\n"
+    "                     [--select=ERRORS | --ignore=ERRORS] [--show-source]\n"
+    "                     [--statistics] [--count] [--benchmark] PATH...\n"
+    "  options_example.py (--doctest | --testsuite=DIR)\n"
+    "  options_example.py --version\n"
+    "\n"
+    "Arguments:\n"
+    "  PATH  destination path\n"
+    "\n"
+    "Options:\n"
+    "  -h --help            show this help message and exit\n"
+    "  --version            show version and exit\n"
+    "  -v --verbose         print status messages\n"
+    "  -q --quiet           report only file names\n"
+    "  -r --repeat          show all occurrences of the same error\n"
+    "  --exclude=PATTERNS   exclude files or directories which match these comma\n"
+    "                       separated patterns [default: .svn,CVS,.bzr,.hg,.git]\n"
+    "  -f NAME --file=NAME  when parsing directories, only check filenames matching\n"
+    "                       these comma separated patterns [default: *.py]\n"
+    "  --select=ERRORS      select errors and warnings (e.g. E,W6)\n"
+    "  --ignore=ERRORS      skip errors and warnings (e.g. E4,W)\n"
+    "  --show-source        show source code for each error\n"
+    "  --statistics         count errors and warnings\n"
+    "  --count              print total number of errors and warnings to standard\n"
+    "                       error and set exit code to 1 if total is not null\n"
+    "  --benchmark          measure processing speed\n"
+    "  --testsuite=DIR      run regression tests from dir\n"
+    "  --doctest            run doctest on myself\n",
 };
 
 const struct docopt_test tests[] =
@@ -467,10 +507,19 @@ const struct docopt_test tests[] =
     { 72, { "ship", "USS Enterprise", "move", "10", "20" }, { { "ship", 0, 0 }, { "<name>", 0, "USS Enterprise" }, { "--speed", 0, "10" } } },
     { 72, { "ship", "USS Enterprise", "move", "10", "20", "--speed=11.3" }, { { "ship", 0, 0 }, { "<name>", 0, "USS Enterprise" }, { "--speed", 0, "11.3" } } },
     { 72, { "ship", "shoot", "3", "4" },    { { "ship", 0, 0 }, { "shoot", 0, 0 }, { "<x>", 0, "3" }, { "<y>", 0, "4" } } },
-    //mine (set|remove) <x> <y> [--moored|--drifting]
     { 72, { "mine", "set", "10", "12" },    { { "mine", 0, 0}, { "set", 0, 0 }, { "<x>", 0, "10" }, { "<y>", 0, "12" } } },
     { 72, { "mine", "set", "10", "12", "--moored" }, { { "mine", 0, 0}, { "set", 0, 0 }, { "<x>", 0, "10" }, { "<y>", 0, "12" }, { "--moored", 0, 0 } } },
     { 72, { "mine", "set", "10", "12", "--drifting" }, { { "mine", 0, 0}, { "set", 0, 0 }, { "<x>", 0, "10" }, { "<y>", 0, "12" }, { "--drifting", 0, 0 } } },
+    { 72, { "mine", "remove", "10", "12" },    { { "mine", 0, 0}, { "remove", 0, 0 }, { "<x>", 0, "10" }, { "<y>", 0, "12" } } },
+    { 72, { "mine", "remove", "10", "12", "--moored" }, { { "mine", 0, 0}, { "remove", 0, 0 }, { "<x>", 0, "10" }, { "<y>", 0, "12" }, { "--moored", 0, 0 } } },
+    { 72, { "mine", "remove", "10", "12", "--drifting" }, { { "mine", 0, 0}, { "remove", 0, 0 }, { "<x>", 0, "10" }, { "<y>", 0, "12" }, { "--drifting", 0, 0 } } },
+
+    { 73, { "--help" },                     { } },
+    { 73, { "1", "2", "3", "4" },           { { "ODD", 0, "1" }, { "EVEN", 0, "2" }, { "ODD", 1, "3" }, { "EVEN", 1, "4" } } },
+
+    { 74, { "--help" },                     { } },
+    { 74, { "-fFOO", "HERE", "THERE" },     { { "-f", 0, "FOO" }, { "PATH", 0, "HERE" }, { "PATH", 1, "THERE" } } },
+    { 74, { "--doctest" },                  { { "--doctest", 0, 0 }, { "-f", 0, "*.py" }, { "--file", 0, "*.py"} } },
 };
 
 int check_test(docopt_t doc, int test);
@@ -482,7 +531,7 @@ int main(int argc, char **argv)
     "  test self-test\n"
     "  test one N\n";
 
-    docopt_t doc        = docopt(docstr, argc-1, argv+1, NULL, 0);
+    docopt_t doc        = docopt(docstr, argc-1, argv+1, 0);
     unsigned long low   = 0;
     unsigned long high  = sizeof(tests)/sizeof(tests[0]);
     if (doc && !docopt_error(doc))
@@ -507,7 +556,7 @@ int main(int argc, char **argv)
         int argc        = 0;
         for (int j = 0; tests[i].args[j]; ++j, ++argc)
             ;
-        docopt_t doc    = docopt(usages[tests[i].usage], argc, (char**)tests[i].args, NULL, DOCOPT_NO_HELP);
+        docopt_t doc    = docopt(usages[tests[i].usage], argc, (char**)tests[i].args, DOCOPT_NO_HELP);
         if (!doc)
         {
             fprintf(stdout, "Failed to parse (%d):\n====\n%s\n====\n", i, usages[tests[i].usage]);
