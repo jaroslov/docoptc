@@ -363,6 +363,11 @@ const char *usages[] =
     "Usage: test ARG [-- OPTARG...]",
     /* 76 */
     "Usage: test [<arg0> <arg1> <arg2>]",
+    /* 77 */
+    "Usage: test ( cmda <sw0> <sw1>\n"
+    "            | cmdb <sw0> <sw1>\n"
+    "            | cmdc <a-0> <a-1>)\n"
+    "            [cmdd A B | cmde N | cmdf | cmdg]",
 };
 
 const struct docopt_test tests[] =
@@ -533,6 +538,11 @@ const struct docopt_test tests[] =
     { 76, { "A" },                          { { "<arg0>", 0, "A" } } },
     { 76, { "A", "B" },                     { { "<arg0>", 0, "A" }, { "<arg1>", 0, "B" } } },
     { 76, { "A", "B", "C" },                { { "<arg0>", 0, "A" }, { "<arg1>", 0, "B" }, { "<arg2>", 0, "C" } } },
+
+    { 77, { "--help" },                     { } },
+    { 77, { "cmda", "0", "1" },             { { "cmda", 0, 0 }, { "<sw0>", 0, "0" }, { "<sw1>", 0, "1" } } },
+    { 77, { "cmda", "0", "1", "cmdd", "A", "B" }, { { "cmda", 0, 0 }, { "<sw0>", 0, "0" }, { "<sw1>", 0, "1" }, { "cmdd", 0, 0 }, { "A", 0, "A" }, { "B", 0, "B" } } },
+    { 77, { "cmda", "0", "1", "cmde", "X" }, { { "cmda", 0, 0 }, { "<sw0>", 0, "0" }, { "<sw1>", 0, "1" }, { "cmde", 0, 0 }, { "N", 0, "X" } } },
 };
 
 int check_test(docopt_t doc, int test);
