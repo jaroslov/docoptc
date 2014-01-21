@@ -27,7 +27,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #define DOCOPT_C
-//#define DOCOPT_DEBUG
+#define DOCOPT_DEBUG
 #include "docopt.h"
 
 struct docopt_check
@@ -366,7 +366,7 @@ const char *usages[] =
     /* 77 */
     "Usage: test ( cmda <sw0> <sw1>\n"
     "            | cmdb <sw0> <sw1>\n"
-    "            | cmdc <a-0> <a-1>)\n"
+    "            | cmdc <a-0> <a-1> <a-2> <a-3>)\n"
     "            [cmdd A B | cmde N | cmdf | cmdg]",
 };
 
@@ -543,6 +543,7 @@ const struct docopt_test tests[] =
     { 77, { "cmda", "0", "1" },             { { "cmda", 0, 0 }, { "<sw0>", 0, "0" }, { "<sw1>", 0, "1" } } },
     { 77, { "cmda", "0", "1", "cmdd", "A", "B" }, { { "cmda", 0, 0 }, { "<sw0>", 0, "0" }, { "<sw1>", 0, "1" }, { "cmdd", 0, 0 }, { "A", 0, "A" }, { "B", 0, "B" } } },
     { 77, { "cmda", "0", "1", "cmde", "X" }, { { "cmda", 0, 0 }, { "<sw0>", 0, "0" }, { "<sw1>", 0, "1" }, { "cmde", 0, 0 }, { "N", 0, "X" } } },
+    { 77, { "cmdc", "a", "b", "c", "d", "cmdf" }, { { "cmdc", 0, 0 }, { "<a-0>", 0, "a" }, { "<a-1>", 0, "b" }, { "<a-2>", 0, "c" }, { "<a-3>", 0, "d" }, { "cmdf", 0, 0 } } },
 };
 
 int check_test(docopt_t doc, int test);

@@ -286,6 +286,8 @@ static int docopt_parse_state_init(struct docopt_parse_state* dS, const char* do
 {
 #if defined(DOCOPT_DEBUG)
     dS->log                         = stdout;
+    dS->indent                      = 0;
+    dS->scale                       = 2;
 #else
     dS->log                         = fopen(DOCOPT_NULL_FILE, "w");
 #endif
@@ -456,16 +458,23 @@ static int docopt_parse_atom(struct docopt_parse_state* dS, struct docopt_str* u
 static int docopt_parse_expr(struct docopt_parse_state* dS, struct docopt_str* usestmt)
 {
     if (dS->entries->error) return 0;
+    int multisequence           = 0;
     struct docopt_str olduse    = *usestmt;
     int hterm                   = docopt_new_term(dS, DOCOPT_TYPE_EXPR);
     DO_TM(hterm)->optional = dS->optional;
     docopt_eat_ws(usestmt);
     while ((usestmt->fst < usestmt->lst) && docopt_parse_seq(dS, usestmt))
     {
+        ++multisequence;
         docopt_eat_ws(usestmt);
         if (usestmt->fst[0] != '|') break;
         ++usestmt->fst;
         docopt_eat_ws(usestmt);
+    }
+    if (DO_TM(hterm)->optional && (multisequence == 1))
+    {
+        for (int x = 1; x < DO_TM(hterm+1)->length; x += DO_TM(hterm+1+x)->length)
+            DO_TM(hterm+1+x)->optional = 1;
     }
     if ((hterm + 1) == dS->curterm)
     {
@@ -483,7 +492,6 @@ int docopt_parse_seq(struct docopt_parse_state* dS, struct docopt_str* usestmt)
     struct docopt_str olduse    = *usestmt;
     int hterm                   = docopt_new_term(dS, DOCOPT_TYPE_SEQ);
     int atom                    = -1;
-    DO_TM(hterm)->optional = dS->optional;
     docopt_eat_ws(usestmt);
     atom                        = dS->curterm;
     while ((usestmt->fst < usestmt->lst) && docopt_parse_atom(dS, usestmt))
@@ -582,7 +590,6 @@ int docopt_parse_atom(struct docopt_parse_state* dS, struct docopt_str* usestmt)
                 entry.command.fst   = usestmt->fst + dS->docopt_pmatches[5].rm_so;
                 entry.command.lst   = usestmt->fst + dS->docopt_pmatches[5].rm_eo;
             }
-            DO_TM(hterm)->optional = dS->optional;
             DO_TM(hterm)->entry = docopt_entries_insert_entry(dS->entries, &entry);
         }
         usestmt->fst    += dS->docopt_pmatches[0].rm_eo;
@@ -608,7 +615,6 @@ int docopt_parse_atom(struct docopt_parse_state* dS, struct docopt_str* usestmt)
     if (olduse.fst == usestmt->fst) goto docoptFail;
     if (hterm >= 0)
     {
-        DO_TM(hterm)->optional  = dS->optional;
         DO_TM(hterm)->length    = dS->curterm - hterm;
     }
     return hterm;
@@ -671,8 +677,6 @@ static int docopt_unify_args(struct docopt_parse_state* dS, int hterm)
     struct docopt_entry* terma  = argterm
                                 ? docopt_fetch_entry(dS->args, argterm->entry)
                                 : 0;
-    dS->indent                  = 0;
-    dS->scale                   = 2;
 
     fprintf(dS->log, "%*s%s(%.*s%s)[%d]%s%s\n",
         dS->scale*dS->indent, "",
@@ -727,21 +731,13 @@ static int docopt_unify_args(struct docopt_parse_state* dS, int hterm)
         break;
     case DOCOPT_TYPE_SEQ                :
         ++dS->indent;
-        if (!term->optional)
-        {
-            for (int i = 1; i < term->length; i += DO_TM(hterm+i)->length)
-                if (!(result = docopt_unify_args(dS, hterm+i)))
-                    break;
-        }
-        else
-        {
-            result = 0;
-            for (int i = 1; i < term->length; i += DO_TM(hterm+i)->length)
-                if (docopt_unify_args(dS, hterm+i))
-                {
-                    result = 1;
-                }
-        }
+        result = 1;
+        for (int i = 1; i < term->length; i += DO_TM(hterm+i)->length)
+            if (!docopt_unify_args(dS, hterm+i) && !DO_TM(hterm+i)->optional)
+            {
+                result = 0;
+                break;
+            }
         --dS->indent;
         break;
     case DOCOPT_TYPE_PNAME              :
