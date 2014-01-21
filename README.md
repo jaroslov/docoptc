@@ -3,7 +3,7 @@ DOCOPTC
 
 Docoptc is a [docopt](http://docopt.org) *variant*, not a port. However, it can currently consume all the examples given in the python reference implementation.
 
-#### Docoptc building & using
+#### Docoptc building
 
 Docoptc is a single, combined, header and source file. To use as a header file, simply include it as usual:
 
@@ -21,6 +21,10 @@ If you feel there is a bug (not unlikely), then debugging can be turned on, as w
     #include "docopt.h"
 
 Docoptc is known to compile with [clang](http://clang.llvm.org).
+
+#### Docoptc using
+
+**Put a brief DOCOPT description, here**
 
 #### Docoptc design
 
@@ -79,7 +83,7 @@ The resulting AST defines a grammar for parsing arguments.
 
 ##### Arguments parsing
 
-Arguments are first classified as either a LONG, a SHORT, or an ARGUMENT; LONGs and SHORTs are parsed, as above. If the ARGUMENT `--` is seen in the arguments, then all subsequent arguments are classified as ARGUMENT. (The docopt reference refers to this as argument tokenization.)
+Arguments are first classified as either a LONG, a SHORT, or an ARGUMENT; LONGs and SHORTs are parsed, as above. (The docopt reference refers to this as argument tokenization.) If the ARGUMENT `--` is seen in the arguments, then all subsequent arguments are classified as ARGUMENT.
 
 The final stage is to unify the tokenized arguments against the grammar defined by the parsed document string. This is done by letting the document string grammar be interpreted as a parsing expression grammar.
 
