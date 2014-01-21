@@ -29,6 +29,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef DOCOPT_H
 #define DOCOPT_H
 
+#define DOCOPT_VERSION              0x00000100
 #define DOCOPT_OK                   0
 #define DOCOPT_BAD_DEFAULTS         1
 #define DOCOPT_BAD_USAGE_NAME       2
@@ -36,6 +37,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
 #define DOCOPT_BAD_ARGED_SHORTS     4
 #define DOCOPT_PRINTED_HELP         5
 #define DOCOPT_BAD_ARG_ALLOC        6
+#define DOCOPT_BAD_VERSION          7
 
 #define DOCOPT_NO_HELP              0x1
 #define DOCOPT_HELP                 0x0
@@ -48,7 +50,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
 typedef void* docopt_t;
 typedef struct docopt_str { const char* fst; const char* lst; } docopt_str_t;
 
-docopt_t docopt(const char* doc, int argc, char** argv, unsigned int flags);
+docopt_t docopt(const char* doc, int argc, char** argv, unsigned int flags, unsigned int version);
 docopt_str_t* docopt_get(docopt_t, const char*, int);
 int docopt_error(docopt_t);
 void docopt_free(docopt_t);
@@ -949,10 +951,16 @@ void docopt_print_help(struct docopt_parse_state* dS, int moreInfo)
     }
 }
 
-docopt_t docopt(const char* doc, int argc, char** argv, unsigned int flags)
+docopt_t docopt(const char* doc, int argc, char** argv, unsigned int flags, unsigned int version)
 {
     struct docopt_parse_state   dS  = { 0 };
     struct docopt_entries*      dE  = 0;
+    uint32_t VERSION                = DOCOPT_VERSION;
+    if (((version & 0x00FF0000) != (VERSION & 0x00FF0000)) || (version < VERSION))
+    {
+        dS.entries->error           = DOCOPT_BAD_VERSION;
+        goto docoptFail;
+    }
     if (docopt_parse_state_init(&dS, doc, argc, argv, flags)) goto docoptFail;
     if (dS.entries->error) goto docoptFail;
     fprintf(dS.log, "%s", "Getting Usage Section.\n");

@@ -544,7 +544,7 @@ int main(int argc, char **argv)
     "  test self-test\n"
     "  test one N\n";
 
-    docopt_t doc        = docopt(docstr, argc-1, argv+1, 0);
+    docopt_t doc        = docopt(docstr, argc-1, argv+1, 0, DOCOPT_VERSION);
     unsigned long low   = 0;
     unsigned long high  = sizeof(tests)/sizeof(tests[0]);
     if (doc && !docopt_error(doc))
@@ -569,7 +569,7 @@ int main(int argc, char **argv)
         int argc        = 0;
         for (int j = 0; tests[i].args[j]; ++j, ++argc)
             ;
-        docopt_t doc    = docopt(usages[tests[i].usage], argc, (char**)tests[i].args, DOCOPT_NO_HELP);
+        docopt_t doc    = docopt(usages[tests[i].usage], argc, (char**)tests[i].args, DOCOPT_NO_HELP, DOCOPT_VERSION);
         if (!doc)
         {
             fprintf(stdout, "Failed to parse (%d):\n====\n%s\n====\n", i, usages[tests[i].usage]);
