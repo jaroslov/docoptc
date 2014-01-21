@@ -29,6 +29,11 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef DOCOPT_H
 #define DOCOPT_H
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #define DOCOPT_VERSION              0x00000100
 #define DOCOPT_OK                   0
 #define DOCOPT_BAD_DEFAULTS         1
@@ -256,7 +261,7 @@ static int docopt_new_term(struct docopt_parse_state* dS, enum DOCOPT_TYPE type)
     if ((dS->curterm+1) >= dS->nterms)
     {
         dS->nterms      *= 2;
-        dS->terms       = realloc(dS->terms, sizeof(struct docopt_term) * dS->nterms);
+        dS->terms       = (struct docopt_term*)realloc(dS->terms, sizeof(struct docopt_term) * dS->nterms);
     }
     memset(docopt_fetch_term(dS, hterm), 0x0, sizeof(struct docopt_term));
     docopt_fetch_term(dS, hterm)->type = type;
@@ -567,7 +572,7 @@ int docopt_parse_atom(struct docopt_parse_state* dS, struct docopt_str* usestmt)
     else if ((dS->arged_shorts[0] && !regexec(&dS->re_arged_shorts, usestmt->fst, DOCOPT_NUM_PMATCHES, &dS->docopt_pmatches[0], 0)) ||
         !regexec(&dS->re_naked_shorts, usestmt->fst, DOCOPT_NUM_PMATCHES, &dS->docopt_pmatches[0], 0))
     {
-        for (int h = dS->docopt_pmatches[3].rm_so, he = dS->docopt_pmatches[3].rm_eo; h < he; ++h)
+        for (int h = (int)dS->docopt_pmatches[3].rm_so, he = (int)dS->docopt_pmatches[3].rm_eo; h < he; ++h)
         {
             sprintf(&entry.short_name[0], "-%c", usestmt->fst[h]);
             hterm           = docopt_new_term(dS, DOCOPT_TYPE_SHORT);
@@ -1045,3 +1050,7 @@ void docopt_free(docopt_t doc)
 #undef DO_TM
 
 #endif/*DOCOPT_C*/
+
+#ifdef __cplusplus
+} // end extern "C"
+#endif
