@@ -360,7 +360,9 @@ const char *usages[] =
     "  --testsuite=DIR      run regression tests from dir\n"
     "  --doctest            run doctest on myself\n",
     /* 75 */
-    "Usage: test ARG [-- OPTARG...]"
+    "Usage: test ARG [-- OPTARG...]",
+    /* 76 */
+    "Usage: test [<arg0> <arg1> <arg2>]",
 };
 
 const struct docopt_test tests[] =
@@ -526,6 +528,11 @@ const struct docopt_test tests[] =
     { 75, { "--help" },                     { } },
     { 75, { "A", "--", "C", "D", "E" },     { { "ARG", 0, "A" }, { "OPTARG", 0, "C" }, { "OPTARG", 1, "D" }, { "OPTARG", 2, "E" } } },
     { 75, { "A", "--", "--C", "--D", "--E" }, { { "ARG", 0, "A" }, { "OPTARG", 0, "--C" }, { "OPTARG", 1, "--D" }, { "OPTARG", 2, "--E" } } },
+
+    { 76, { "--help" },                     { } },
+    { 76, { "A" },                          { { "<arg0>", 0, "A" } } },
+    { 76, { "A", "B" },                     { { "<arg0>", 0, "A" }, { "<arg1>", 0, "B" } } },
+    { 76, { "A", "B", "C" },                { { "<arg0>", 0, "A" }, { "<arg1>", 0, "B" }, { "<arg2>", 0, "C" } } },
 };
 
 int check_test(docopt_t doc, int test);
