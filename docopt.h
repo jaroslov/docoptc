@@ -330,6 +330,7 @@ static void docopt_strip(struct docopt_str* str, const char* what)
 
 static int docopt_get_section(struct docopt_parse_state* dS, regex_t* start, regex_t* stop, const char* fst, struct docopt_str* sec, int pidx, int qidx)
 {
+    if (dS->entries->error) return 1;
     if (regexec(start, fst, DOCOPT_NUM_PMATCHES, &docopt_pmatches[0], 0))
         return 1;
     if (docopt_pmatches[pidx].rm_so < 0) return 1;
@@ -342,6 +343,7 @@ static int docopt_get_section(struct docopt_parse_state* dS, regex_t* start, reg
 
 static int docopt_parse_options(struct docopt_parse_state* dS)
 {
+    if (dS->entries->error) return 1;
     struct docopt_str optstmt   = { 0 };
     struct docopt_entry option  = { };
     int which_first             = 0;
@@ -443,6 +445,7 @@ static int docopt_parse_atom(struct docopt_parse_state* dS, struct docopt_str* u
 
 static int docopt_parse_expr(struct docopt_parse_state* dS, struct docopt_str* usestmt)
 {
+    if (dS->entries->error) return 0;
     struct docopt_str olduse    = *usestmt;
     int hterm                   = docopt_new_term(dS, DOCOPT_TYPE_EXPR);
     docopt_fetch_term(dS, hterm)->optional = dS->optional;
@@ -466,6 +469,7 @@ static int docopt_parse_expr(struct docopt_parse_state* dS, struct docopt_str* u
 
 int docopt_parse_seq(struct docopt_parse_state* dS, struct docopt_str* usestmt)
 {
+    if (dS->entries->error) return 0;
     struct docopt_str olduse    = *usestmt;
     int hterm                   = docopt_new_term(dS, DOCOPT_TYPE_SEQ);
     int atom                    = -1;
@@ -494,6 +498,7 @@ int docopt_parse_seq(struct docopt_parse_state* dS, struct docopt_str* usestmt)
 
 static void docopt_parse_command(struct docopt_parse_state* dS, struct docopt_str* usestmt)
 {
+    if (dS->entries->error) return;
     while (
         (usestmt->fst < usestmt->lst) &&
         (strncmp(DOCOPT_REPEAT, usestmt->fst, strlen(DOCOPT_REPEAT)) != 0) &&
@@ -505,6 +510,7 @@ static void docopt_parse_command(struct docopt_parse_state* dS, struct docopt_st
 
 int docopt_parse_atom(struct docopt_parse_state* dS, struct docopt_str* usestmt)
 {
+    if (dS->entries->error) return 0;
     struct docopt_str olduse    = *usestmt;
     struct docopt_entry entry   = { };
     int hterm                   = -1;
@@ -604,6 +610,7 @@ docoptFail:
 
 static int docopt_parse_usage(struct docopt_parse_state* dS)
 {
+    if (dS->entries->error) return 0;
     char pname[512]             = { 0 };
     char re_pname[512]          = { 0 };
     struct docopt_str   usestmt = { 0, 0 };
@@ -643,6 +650,7 @@ static int docopt_parse_usage(struct docopt_parse_state* dS)
 
 static int docopt_unify_args(struct docopt_parse_state* dS, int hterm)
 {
+    if (dS->entries->error) return 0;
     static int indent           = 0;
     static int scale            = 2;
     int result                  = 0;
@@ -846,6 +854,7 @@ docoptUnifyLong:
 
 static int docopt_parse_args(struct docopt_parse_state* dS)
 {
+    if (dS->entries->error) return 0;
     // options* commands* -- arguments*
     struct docopt_entries argE  = *dS->entries;
     struct docopt_entries *docE = dS->entries;
@@ -941,17 +950,22 @@ docopt_t docopt(const char* doc, int argc, char** argv, unsigned int flags)
     struct docopt_parse_state   dS  = { 0 };
     struct docopt_entries*      dE  = 0;
     if (docopt_parse_state_init(&dS, doc, argc, argv, flags)) goto docoptFail;
+    if (dS.entries->error) goto docoptFail;
     fprintf(dS.log, "%s", "Getting Usage Section.\n");
     if (docopt_get_section(&dS, &dS.re_usage_section_start, &dS.re_usage_section_stop, dS.entries->docstr.fst, &dS.usage_section, 0, 0)) goto docoptFail;
+    if (dS.entries->error) goto docoptFail;
     fprintf(dS.log, "%s", "Getting Usage PNAME... ");
     if (regexec(&dS.re_pname, dS.usage_section.fst, DOCOPT_NUM_PMATCHES, &docopt_pmatches[0], 0)) return 0;
+    if (dS.entries->error) goto docoptFail;
     fprintf(dS.log, "" PRdocS "\n", DOCOPT_PR(&dS.pname));
     dS.pname.fst    = docopt_pmatches[2].rm_so + dS.usage_section.fst;
     dS.pname.lst    = docopt_pmatches[2].rm_eo + dS.usage_section.fst;
     fprintf(dS.log, "%s", "Getting Parse Options.\n");
     if (docopt_parse_options(&dS)) goto docoptFail;
+    if (dS.entries->error) goto docoptFail;
     fprintf(dS.log, "%s", "Getting Parse Usage.\n");
     if (docopt_parse_usage(&dS)) goto docoptFail;
+    if (dS.entries->error) goto docoptFail;
     dE      = dS.entries;
     fprintf(dS.log, "Getting Parse Args (%d).\n", argc);
     if (argc && docopt_parse_args(&dS))
@@ -981,6 +995,7 @@ int docopt_error(docopt_t doc)
 docopt_str_t* docopt_get(docopt_t doc, const char* cmd, int idx)
 {
     struct docopt_entries* dE   = (struct docopt_entries*)doc;
+    assert(!dE->error || (dE->error == DOCOPT_PRINTED_HELP));
     struct docopt_str str       = { cmd, cmd + strlen(cmd) };
     struct docopt_entry* owner  = 0;
     struct docopt_str* result   = 0;
