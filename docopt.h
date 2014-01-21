@@ -315,7 +315,9 @@ docoptFail:
     return 1;
 }
 
-/* After this point it is illegal to declare docopt_term*, docopt_entry*, or docopt_arg*.*/
+/*====[ After this point it is illegal to declare docopt_term*, docopt_entry*, or docopt_arg*.]====*/
+
+#define DO_TM(TERM) docopt_fetch_term(dS, (TERM))
 
 static void docopt_eat_ws(struct docopt_str* str)
 {
@@ -361,8 +363,8 @@ static int docopt_parse_options(struct docopt_parse_state* dS)
     optstmt.fst                 = dS->option_section.fst;
 
     options_x                   = docopt_new_term(dS, DOCOPT_TYPE_OPTION_SECTION);
-    docopt_fetch_term(dS, options_x)->repeat    = 1;
-    docopt_fetch_term(dS, options_x)->optional  = 1;
+    DO_TM(options_x)->repeat    = 1;
+    DO_TM(options_x)->optional  = 1;
     while (!docopt_get_section(dS, &dS->re_option_statement_start, &dS->re_option_statement_start, optstmt.fst, &optstmt, 3, 0))
     {
         fprintf(dS->log, "%s\n", "Parsing Option Statement.");
@@ -378,7 +380,7 @@ static int docopt_parse_options(struct docopt_parse_state* dS)
             if ((which_first != 1) && regexec(&dS->re_optshort, optstmt.fst, DOCOPT_NUM_PMATCHES, &docopt_pmatches[0], 0) == 0)
             {
                 sterm       = docopt_new_term(dS, DOCOPT_TYPE_SHORT);
-                docopt_fetch_term(dS, sterm)->length = 1;
+                DO_TM(sterm)->length = 1;
                 which_first = 1;
                 sprintf(option.short_name, "-%c", optstmt.fst[1]);
                 if (docopt_pmatches[4].rm_so >= 0)
@@ -391,7 +393,7 @@ static int docopt_parse_options(struct docopt_parse_state* dS)
             {
                 which_first = 2;
                 lterm           = docopt_new_term(dS, DOCOPT_TYPE_LONG);
-                docopt_fetch_term(dS, lterm)->length = 1;
+                DO_TM(lterm)->length = 1;
                 option.name.fst = optstmt.fst;
                 option.name.lst = optstmt.fst + docopt_pmatches[2].rm_eo;
                 if (docopt_pmatches[4].rm_so >= 0)
@@ -412,12 +414,12 @@ static int docopt_parse_options(struct docopt_parse_state* dS)
         option.defvalue.fst     = optstmt.fst + docopt_pmatches[2].rm_so;
         option.defvalue.lst     = optstmt.fst + docopt_pmatches[2].rm_eo;
 docoptAddOption:
-        if (lterm >= 0) docopt_fetch_term(dS, lterm)->entry = docopt_entries_insert_entry(dS->entries, &option);
-        if (sterm >= 0) docopt_fetch_term(dS, sterm)->entry = docopt_entries_insert_entry(dS->entries, &option);
-        docopt_fetch_term(dS, options_s)->length = dS->curterm - options_s;
+        if (lterm >= 0) DO_TM(lterm)->entry = docopt_entries_insert_entry(dS->entries, &option);
+        if (sterm >= 0) DO_TM(sterm)->entry = docopt_entries_insert_entry(dS->entries, &option);
+        DO_TM(options_s)->length = dS->curterm - options_s;
         fprintf(dS->log, "%s\n", "... Done Parsing Option Statement.");
     }
-    docopt_fetch_term(dS, options_x)->length = dS->curterm - options_x;
+    DO_TM(options_x)->length = dS->curterm - options_x;
     for (int i = 0, idx = 0, jdx = 0, entry; i < strlen(unarged_shorts); ++i)
     {
         short_name[1]   = unarged_shorts[i];
@@ -448,7 +450,7 @@ static int docopt_parse_expr(struct docopt_parse_state* dS, struct docopt_str* u
     if (dS->entries->error) return 0;
     struct docopt_str olduse    = *usestmt;
     int hterm                   = docopt_new_term(dS, DOCOPT_TYPE_EXPR);
-    docopt_fetch_term(dS, hterm)->optional = dS->optional;
+    DO_TM(hterm)->optional = dS->optional;
     docopt_eat_ws(usestmt);
     while ((usestmt->fst < usestmt->lst) && docopt_parse_seq(dS, usestmt))
     {
@@ -463,7 +465,7 @@ static int docopt_parse_expr(struct docopt_parse_state* dS, struct docopt_str* u
         dS->curterm                 = hterm;
         return 0;
     }
-    docopt_fetch_term(dS, hterm)->length = dS->curterm - hterm;
+    DO_TM(hterm)->length = dS->curterm - hterm;
     return 1;
 }
 
@@ -473,7 +475,7 @@ int docopt_parse_seq(struct docopt_parse_state* dS, struct docopt_str* usestmt)
     struct docopt_str olduse    = *usestmt;
     int hterm                   = docopt_new_term(dS, DOCOPT_TYPE_SEQ);
     int atom                    = -1;
-    docopt_fetch_term(dS, hterm)->optional = dS->optional;
+    DO_TM(hterm)->optional = dS->optional;
     docopt_eat_ws(usestmt);
     atom                        = dS->curterm;
     while ((usestmt->fst < usestmt->lst) && docopt_parse_atom(dS, usestmt))
@@ -481,7 +483,7 @@ int docopt_parse_seq(struct docopt_parse_state* dS, struct docopt_str* usestmt)
         docopt_eat_ws(usestmt);
         if (strncmp(DOCOPT_REPEAT, usestmt->fst, strlen(DOCOPT_REPEAT)) == 0)
         {
-            docopt_fetch_term(dS, atom)->repeat = 1;
+            DO_TM(atom)->repeat = 1;
             usestmt->fst        += 3;
         }
         atom                    = dS->curterm;
@@ -492,7 +494,7 @@ int docopt_parse_seq(struct docopt_parse_state* dS, struct docopt_str* usestmt)
         dS->curterm     = hterm;
         return 0;
     }
-    docopt_fetch_term(dS, hterm)->length = dS->curterm - hterm;
+    DO_TM(hterm)->length = dS->curterm - hterm;
     return 1;
 }
 
@@ -524,7 +526,7 @@ int docopt_parse_atom(struct docopt_parse_state* dS, struct docopt_str* usestmt)
         hterm           = docopt_new_term(dS, DOCOPT_TYPE_PNAME);
         usestmt->fst    += docopt_str_len(&dS->pname);
         entry.name      = dS->pname;
-        docopt_fetch_term(dS, hterm)->entry = docopt_entries_insert_entry(dS->entries, &entry);
+        DO_TM(hterm)->entry = docopt_entries_insert_entry(dS->entries, &entry);
     }
     else if (!regexec(&dS->re_optref, usestmt->fst, DOCOPT_NUM_PMATCHES, &docopt_pmatches[0], 0))
     {
@@ -539,7 +541,7 @@ int docopt_parse_atom(struct docopt_parse_state* dS, struct docopt_str* usestmt)
         seqend          = (olduse.fst[0] == '[') ? ']' : ')';
         hterm           = dS->curarg;
         if (!docopt_parse_expr(dS, usestmt)) goto docoptFail;
-        docopt_fetch_term(dS, hterm)->optional = dS->optional;
+        DO_TM(hterm)->optional = dS->optional;
         hterm           = -1;
         docopt_eat_ws(usestmt);
         if (seqend != usestmt->fst[0]) goto docoptFail;
@@ -556,7 +558,7 @@ int docopt_parse_atom(struct docopt_parse_state* dS, struct docopt_str* usestmt)
             entry.command.fst  = usestmt->fst + docopt_pmatches[4].rm_so;
             entry.command.lst  = usestmt->fst + docopt_pmatches[4].rm_eo;
         }
-        docopt_fetch_term(dS, hterm)->entry = docopt_entries_insert_entry(dS->entries, &entry);
+        DO_TM(hterm)->entry = docopt_entries_insert_entry(dS->entries, &entry);
         usestmt->fst    += docopt_pmatches[0].rm_eo;
     }
     else if ((dS->arged_shorts[0] && !regexec(&dS->re_arged_shorts, usestmt->fst, DOCOPT_NUM_PMATCHES, &docopt_pmatches[0], 0)) ||
@@ -566,14 +568,14 @@ int docopt_parse_atom(struct docopt_parse_state* dS, struct docopt_str* usestmt)
         {
             sprintf(&entry.short_name[0], "-%c", usestmt->fst[h]);
             hterm           = docopt_new_term(dS, DOCOPT_TYPE_SHORT);
-            docopt_fetch_term(dS, hterm)->length = 1;
+            DO_TM(hterm)->length = 1;
             if (((h+1) == docopt_pmatches[3].rm_eo) && (docopt_pmatches[5].rm_so > 0))
             {
                 entry.command.fst   = usestmt->fst + docopt_pmatches[5].rm_so;
                 entry.command.lst   = usestmt->fst + docopt_pmatches[5].rm_eo;
             }
-            docopt_fetch_term(dS, hterm)->optional = dS->optional;
-            docopt_fetch_term(dS, hterm)->entry = docopt_entries_insert_entry(dS->entries, &entry);
+            DO_TM(hterm)->optional = dS->optional;
+            DO_TM(hterm)->entry = docopt_entries_insert_entry(dS->entries, &entry);
         }
         usestmt->fst    += docopt_pmatches[0].rm_eo;
     }
@@ -582,7 +584,7 @@ int docopt_parse_atom(struct docopt_parse_state* dS, struct docopt_str* usestmt)
         hterm           = docopt_new_term(dS, DOCOPT_TYPE_ARGUMENT);
         entry.name.fst  = usestmt->fst;
         entry.name.lst  = usestmt->fst + docopt_pmatches[1].rm_eo;
-        docopt_fetch_term(dS, hterm)->entry = docopt_entries_insert_entry(dS->entries, &entry);
+        DO_TM(hterm)->entry = docopt_entries_insert_entry(dS->entries, &entry);
         usestmt->fst    += docopt_pmatches[0].rm_eo;
     }
     else
@@ -592,14 +594,14 @@ int docopt_parse_atom(struct docopt_parse_state* dS, struct docopt_str* usestmt)
         if (olduse.fst == usestmt->fst) goto docoptFail;
         entry.name.fst  = olduse.fst;
         entry.name.lst  = usestmt->fst;
-        docopt_fetch_term(dS, hterm)->entry = docopt_entries_insert_entry(dS->entries, &entry);
+        DO_TM(hterm)->entry = docopt_entries_insert_entry(dS->entries, &entry);
     }
 
     if (olduse.fst == usestmt->fst) goto docoptFail;
     if (hterm >= 0)
     {
-        docopt_fetch_term(dS, hterm)->optional  = dS->optional;
-        docopt_fetch_term(dS, hterm)->length    = dS->curterm - hterm;
+        DO_TM(hterm)->optional  = dS->optional;
+        DO_TM(hterm)->length    = dS->curterm - hterm;
     }
     return hterm;
 docoptFail:
@@ -641,9 +643,9 @@ static int docopt_parse_usage(struct docopt_parse_state* dS)
             return 1;
         }
         fprintf(dS->log, "...RETRIEVED(%d)\n", dS->curterm - usage_section_s);
-        docopt_fetch_term(dS, usage_section_s)->length = dS->curterm - usage_section_s;
+        DO_TM(usage_section_s)->length  = dS->curterm - usage_section_s;
     }
-    docopt_fetch_term(dS, dS->usage_term)->length = dS->curterm - dS->usage_term;
+    DO_TM(dS->usage_term)->length       = dS->curterm - dS->usage_term;
 
     return 0;
 }
@@ -655,9 +657,9 @@ static int docopt_unify_args(struct docopt_parse_state* dS, int hterm)
     static int scale            = 2;
     int result                  = 0;
     int curarg                  = dS->curarg;
-    struct docopt_term* term    = docopt_fetch_term(dS, hterm);
+    struct docopt_term* term    = DO_TM(hterm);
     struct docopt_term* argterm = (dS->curarg < dS->nargterms)
-                                ? docopt_fetch_term(dS, dS->args_term + dS->curarg)
+                                ? DO_TM(dS->args_term + dS->curarg)
                                 : 0;
     struct docopt_entry* terme  = docopt_fetch_entry(dS->entries, term->entry);
     struct docopt_entry* terma  = argterm
@@ -683,7 +685,7 @@ static int docopt_unify_args(struct docopt_parse_state* dS, int hterm)
         ++indent;
         dS->curarg  = 0;
         curarg      = 0;
-        for (int i = 1; i < term->length; i += docopt_fetch_term(dS, hterm+i)->length)
+        for (int i = 1; i < term->length; i += DO_TM(hterm+i)->length)
             if (docopt_unify_args(dS, hterm+i) && (dS->nargterms == dS->curarg))
                 break;
             else
@@ -708,7 +710,7 @@ static int docopt_unify_args(struct docopt_parse_state* dS, int hterm)
         break;
     case DOCOPT_TYPE_EXPR               :
         ++indent;
-        for (int i = 1; i < term->length; i += docopt_fetch_term(dS, hterm+i)->length)
+        for (int i = 1; i < term->length; i += DO_TM(hterm+i)->length)
             if ((result = docopt_unify_args(dS, hterm+i)))
                 break;
         result |= term->optional;
@@ -718,14 +720,14 @@ static int docopt_unify_args(struct docopt_parse_state* dS, int hterm)
         ++indent;
         if (!term->optional)
         {
-            for (int i = 1; i < term->length; i += docopt_fetch_term(dS, hterm+i)->length)
+            for (int i = 1; i < term->length; i += DO_TM(hterm+i)->length)
                 if (!(result = docopt_unify_args(dS, hterm+i)))
                     break;
         }
         else
         {
             result = 0;
-            for (int i = 1; i < term->length; i += docopt_fetch_term(dS, hterm+i)->length)
+            for (int i = 1; i < term->length; i += DO_TM(hterm+i)->length)
                 if (docopt_unify_args(dS, hterm+i))
                 {
                     result = 1;
@@ -746,7 +748,7 @@ static int docopt_unify_args(struct docopt_parse_state* dS, int hterm)
         if (dS->curarg >= dS->nargterms) break;
         ++indent;
         dS->optional    = 1;
-        for (int i = 1; i < term->length; i += docopt_fetch_term(dS, hterm+i)->length)
+        for (int i = 1; i < term->length; i += DO_TM(hterm+i)->length)
             if ((result = docopt_unify_args(dS, hterm+i)))
                 break;
         dS->optional    = 0;
@@ -755,7 +757,7 @@ static int docopt_unify_args(struct docopt_parse_state* dS, int hterm)
     case DOCOPT_TYPE_OPTION_STATEMENT   :
         if (dS->curarg >= dS->nargterms) break;
         ++indent;
-        for (int i = 1; i < term->length; i += docopt_fetch_term(dS, hterm+i)->length)
+        for (int i = 1; i < term->length; i += DO_TM(hterm+i)->length)
             if (docopt_unify_args(dS, hterm+i))
                 result  = 1;
         --indent;
@@ -778,7 +780,7 @@ docoptUnifyShort:
                 if (dS->terms[dS->args_term+dS->curarg+1].type != DOCOPT_TYPE_ARGUMENT)
                     break;
                 ++dS->curarg;
-                terma   = docopt_fetch_entry(dS->args, docopt_fetch_term(dS, dS->args_term + dS->curarg)->entry);
+                terma   = docopt_fetch_entry(dS->args, DO_TM(dS->args_term + dS->curarg)->entry);
                 docopt_set_arg(dS->entries->args+dS->curarg, terme, &terma->name);
             }
             else docopt_set_arg(dS->entries->args+dS->curarg, terme, &terma->command);
@@ -805,7 +807,7 @@ docoptUnifyLong:
                 if (dS->terms[dS->args_term+dS->curarg+1].type != DOCOPT_TYPE_ARGUMENT)
                     break;
                 ++dS->curarg;
-                terma   = docopt_fetch_entry(dS->args, docopt_fetch_term(dS, dS->args_term + dS->curarg)->entry);
+                terma   = docopt_fetch_entry(dS->args, DO_TM(dS->args_term + dS->curarg)->entry);
                 docopt_set_arg(dS->entries->args+dS->curarg, terme, &terma->name);
             }
             else docopt_set_arg(dS->entries->args+dS->curarg, terme, &terma->command);
@@ -879,27 +881,27 @@ static int docopt_parse_args(struct docopt_parse_state* dS)
             if (!strcmp(dS->argv[i], "--")) dS->positional = 1;
             fprintf(dS->log, "ARGUMENT (%s)\n", dS->argv[i]);
             hterm       = docopt_new_term(dS, DOCOPT_TYPE_ARGUMENT);
-            docopt_fetch_term(dS, hterm)->length = 1;
+            DO_TM(hterm)->length = 1;
             entry.name.fst  = dS->argv[i];
             entry.name.lst  = dS->argv[i] + strlen(dS->argv[i]);
-            docopt_fetch_term(dS, hterm)->entry = docopt_entries_insert_entry(dS->entries, &entry);
+            DO_TM(hterm)->entry = docopt_entries_insert_entry(dS->entries, &entry);
         }
         else
         {
             fprintf(dS->log, "LONG/SHORT (%s)\n", dS->argv[i]);
             hterm           = docopt_parse_atom(dS, &arg);
-            if (docopt_fetch_term(dS, hterm)->type == DOCOPT_TYPE_LONG)
+            if (DO_TM(hterm)->type == DOCOPT_TYPE_LONG)
             {
-                terme       = docopt_fetch_entry(dS->entries, docopt_fetch_term(dS, hterm)->entry);
+                terme       = docopt_fetch_entry(dS->entries, DO_TM(hterm)->entry);
                 if (docopt_str_len(&terme->name) < strlen(dS->argv[i]))
                 {
                     terme->command.fst  = dS->argv[i] + 1 + docopt_str_len(&terme->name);
                     terme->command.lst  = dS->argv[i] + strlen(dS->argv[i]);
                 }
             }
-            if ((docopt_fetch_term(dS, hterm)->type == DOCOPT_TYPE_SHORT) && (strlen(dS->argv[i]) > 2))
+            if ((DO_TM(hterm)->type == DOCOPT_TYPE_SHORT) && (strlen(dS->argv[i]) > 2))
             {
-                terme               = docopt_fetch_entry(dS->entries, docopt_fetch_term(dS, hterm)->entry);
+                terme               = docopt_fetch_entry(dS->entries, DO_TM(hterm)->entry);
                 terme->command.fst  = dS->argv[i] + 2;
                 terme->command.lst  = dS->argv[i] + strlen(dS->argv[i]);
             }
@@ -1029,5 +1031,7 @@ void docopt_free(docopt_t doc)
         free(dE);
     }
 }
+
+#undef DO_TM
 
 #endif/*DOCOPT_C*/
