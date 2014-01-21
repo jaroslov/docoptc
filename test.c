@@ -368,6 +368,12 @@ const char *usages[] =
     "            | cmdb <sw0> <sw1>\n"
     "            | cmdc <a-0> <a-1> <a-2> <a-3>)\n"
     "            [cmdd A B | cmde N | cmdf | cmdg]",
+    /* 77 */
+    "Usage: test ( cmda <sw0> <sw1>\n"
+    "            | cmdb <sw0> <sw1>\n"
+    "            | cmdc <a-0> <a-1> [<a-2> <a-3>])\n"   // XXX: cmdc a b cmde g will parse as cmdc <a-0> <a-1> <a-2> <a-3>
+    "            [cmdd A B | cmde N | cmdf | cmdg]",    //  During argument tokenization we need to classify as command?
+                                                        //  The real issue is that we're not doing real parsing; just unification.
 };
 
 const struct docopt_test tests[] =
