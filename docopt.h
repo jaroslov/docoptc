@@ -721,7 +721,6 @@ static int docopt_unify_args(struct docopt_parse_state* dS, int hterm)
                 if (docopt_unify_args(dS, hterm+i))
                 {
                     result = 1;
-                    break;
                 }
         }
         --indent;
@@ -869,6 +868,7 @@ static int docopt_parse_args(struct docopt_parse_state* dS)
         if (!strcmp(dS->argv[i], "--") || !strcmp(dS->argv[i], "-") || (dS->argv[i][0] != '-') || dS->positional)
         {
             if (!strcmp(dS->argv[i], "--")) dS->positional = 1;
+            fprintf(dS->log, "ARGUMENT (%s)\n", dS->argv[i]);
             hterm       = docopt_new_term(dS, DOCOPT_TYPE_ARGUMENT);
             docopt_fetch_term(dS, hterm)->length = 1;
             entry.name.fst  = dS->argv[i];
@@ -877,6 +877,7 @@ static int docopt_parse_args(struct docopt_parse_state* dS)
         }
         else
         {
+            fprintf(dS->log, "LONG/SHORT (%s)\n", dS->argv[i]);
             hterm           = docopt_parse_atom(dS, &arg);
             if (docopt_fetch_term(dS, hterm)->type == DOCOPT_TYPE_LONG)
             {

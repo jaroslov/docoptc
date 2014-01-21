@@ -359,6 +359,8 @@ const char *usages[] =
     "  --benchmark          measure processing speed\n"
     "  --testsuite=DIR      run regression tests from dir\n"
     "  --doctest            run doctest on myself\n",
+    /* 75 */
+    "Usage: test ARG [-- OPTARG...]"
 };
 
 const struct docopt_test tests[] =
@@ -520,6 +522,10 @@ const struct docopt_test tests[] =
     { 74, { "--help" },                     { } },
     { 74, { "-fFOO", "HERE", "THERE" },     { { "-f", 0, "FOO" }, { "PATH", 0, "HERE" }, { "PATH", 1, "THERE" } } },
     { 74, { "--doctest" },                  { { "--doctest", 0, 0 }, { "-f", 0, "*.py" }, { "--file", 0, "*.py"} } },
+
+    { 75, { "--help" },                     { } },
+    { 75, { "A", "--", "C", "D", "E" },     { { "ARG", 0, "A" }, { "OPTARG", 0, "C" }, { "OPTARG", 1, "D" }, { "OPTARG", 2, "E" } } },
+    { 75, { "A", "--", "--C", "--D", "--E" }, { { "ARG", 0, "A" }, { "OPTARG", 0, "--C" }, { "OPTARG", 1, "--D" }, { "OPTARG", 2, "--E" } } },
 };
 
 int check_test(docopt_t doc, int test);
