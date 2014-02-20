@@ -92,7 +92,7 @@ DOCOPT_TYPE_TBL(DOCOPT_TYPE_NAME)
 #define DOCOPT_RE_ARGUMENT                  "(" DOCOPT_RE_UPPER_ARGUMENT "|(\\<[^\\>]+\\>))"
 #define DOCOPT_RE_DEFAULT                   "(\\[default:[[:space:]]*([^]]*)\\])"
 #define DOCOPT_RE_OPTSHORT                  "(\\-([" DOCOPT_RE_ALL_SHORTS_CHARS "])([ ]?(" DOCOPT_RE_UPPER_ARGUMENT "))?)"
-#define DOCOPT_RE_LONG                      "(\\-\\-([a-zA-Z][a-zA-Z\\-\\_]*)([ =](" DOCOPT_RE_ARGUMENT "))?)"
+#define DOCOPT_RE_LONG                      "(\\-\\-([a-zA-Z]([a-zA-Z]|-|_)*)([ =](" DOCOPT_RE_ARGUMENT "))?)"
 #define DOCOPT_RE_REPEAT                    "(\\.\\.\\.)"
 #define DOCOPT_RE_RESERVED                  "([\\[\\]\\(\\)\\|])"
 #define DOCOPT_RE_USAGE_SECTION_START       "(usage\\:)"
@@ -408,8 +408,8 @@ static int docopt_parse_options(struct docopt_parse_state* dS)
                 option.name.lst = optstmt.fst + dS->docopt_pmatches[2].rm_eo;
                 if (dS->docopt_pmatches[4].rm_so >= 0)
                 {
-                    option.command.fst  = optstmt.fst + dS->docopt_pmatches[4].rm_so;
-                    option.command.lst  = optstmt.fst + dS->docopt_pmatches[4].rm_eo;
+                    option.command.fst  = optstmt.fst + dS->docopt_pmatches[5].rm_so;
+                    option.command.lst  = optstmt.fst + dS->docopt_pmatches[5].rm_eo;
                 }
             }
             if (X == 0) optstmt.fst += dS->docopt_pmatches[0].rm_eo + 1; docopt_eat_ws(&optstmt);
@@ -571,8 +571,8 @@ int docopt_parse_atom(struct docopt_parse_state* dS, struct docopt_str* usestmt)
         entry.name.lst  = usestmt->fst + dS->docopt_pmatches[2].rm_eo;
         if (dS->docopt_pmatches[4].rm_so >= 0)
         {
-            entry.command.fst  = usestmt->fst + dS->docopt_pmatches[4].rm_so;
-            entry.command.lst  = usestmt->fst + dS->docopt_pmatches[4].rm_eo;
+            entry.command.fst  = usestmt->fst + dS->docopt_pmatches[5].rm_so;
+            entry.command.lst  = usestmt->fst + dS->docopt_pmatches[5].rm_eo;
         }
         DO_TM(hterm)->entry = docopt_entries_insert_entry(dS->entries, &entry);
         usestmt->fst    += dS->docopt_pmatches[0].rm_eo;
