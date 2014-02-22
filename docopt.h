@@ -979,12 +979,12 @@ docopt_t docopt(const char* doc, int argc, char** argv, unsigned int flags, unsi
     fprintf(dS.log, "%s", "Getting Parse Usage.\n");
     if (docopt_parse_usage(&dS)) goto docoptFail;
     if (dS.entries->error) goto docoptFail;
-    dE      = dS.entries;
     fprintf(dS.log, "Getting Parse Args (%d).\n", argc);
     if (argc && docopt_parse_args(&dS))
     {
         goto docoptFail;
     }
+    dE      = dS.entries;
 
     fprintf(dS.log, "%s", "Success!\n");
 
