@@ -60,11 +60,20 @@ docopt_str_t* docopt_get(docopt_t, const char*, int);
 int docopt_error(docopt_t);
 void docopt_free(docopt_t);
 
+#ifdef __cplusplus
+}// end extern "C"
+#endif
+
 #endif/*DOCOPT_H*/
 
 /*=============================================================================*/
 
 #ifdef  DOCOPT_C
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
 #include <assert.h>
 #include <ctype.h>
@@ -1045,8 +1054,8 @@ void docopt_free(docopt_t doc)
 
 #undef DO_TM
 
-#endif/*DOCOPT_C*/
-
 #ifdef __cplusplus
 } // end extern "C"
 #endif
+
+#endif/*DOCOPT_C*/
