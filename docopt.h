@@ -75,8 +75,10 @@ extern "C"
 {
 #endif
 
+#define __STDC_FORMAT_MACROS
 #include <assert.h>
 #include <ctype.h>
+#include <inttypes.h>
 #include <regex.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -800,7 +802,7 @@ docoptUnifyShort:
             else docopt_set_arg(dS->entries->args+dS->curarg, terme, &terma->command);
         }
         else docopt_set_arg(dS->entries->args+dS->curarg, terme, &terma->name);
-        fprintf(dS->log, "%*s   [0x%010llX]\n", dS->scale*dS->indent, "", (uint64_t)dS->entries->args[dS->curarg].owner);
+        fprintf(dS->log, "%*s   [0x%010" PRIX64 "]\n", dS->scale*dS->indent, "", (uint64_t)dS->entries->args[dS->curarg].owner);
         ++dS->curarg;
         result = 1;
         break;
@@ -1004,7 +1006,7 @@ docoptFail:
             docopt_print_help(&dS, 1);
             return dE;
         }
-    if ((argc == 0) || !dE) docopt_print_help(&dS, 0);
+    if (!dE) docopt_print_help(&dS, 0);
     docopt_parse_state_free(&dS);
     return dE;
 }
